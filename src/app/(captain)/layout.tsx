@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -14,9 +14,20 @@ export default function CaptainLayout({
 }) {
   const { profile, signOut, loading } = useAuth()
   const pathname = usePathname()
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading) {
+      if (!profile) {
+        router.push('/login')
+      } else if (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager') {
+        router.push('/dashboard')
+      }
+    }
+  }, [loading, profile, router])
+
+  if (loading || !profile || (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager')) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">

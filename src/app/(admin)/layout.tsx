@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { useTheme } from '@/providers/theme-provider'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Grid,
@@ -30,10 +30,21 @@ export default function AdminLayout({
   const { profile, signOut, loading } = useAuth()
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading) {
+      if (!profile) {
+        router.push('/login')
+      } else if (profile.role !== 'admin' && profile.role !== 'manager') {
+        router.push('/captain/tables')
+      }
+    }
+  }, [loading, profile, router])
+
+  if (loading || !profile || (profile.role !== 'admin' && profile.role !== 'manager')) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">
