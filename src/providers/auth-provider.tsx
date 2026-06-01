@@ -29,18 +29,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session) {
           setUser(session.user)
           
-          // Load role from user metadata or custom profiles table later.
-          // Fallback to 'captain' for safety.
-          const userRole = (session.user.user_metadata?.role as UserRole) || 'captain'
-          const userProfile: UserProfile = {
-            id: session.user.id,
-            email: session.user.email || '',
-            role: userRole,
-            name: session.user.user_metadata?.name || 'Staff User',
-            restaurant_id: session.user.user_metadata?.restaurant_id || 'rest-123',
-            created_at: session.user.created_at,
+          // Load real profile from database users table
+          const { data: dbProfile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+
+          if (dbProfile) {
+            setProfile({
+              id: dbProfile.id,
+              email: dbProfile.email,
+              role: dbProfile.role as UserRole,
+              name: dbProfile.name,
+              restaurant_id: dbProfile.restaurant_id,
+              created_at: dbProfile.created_at
+            })
+          } else {
+            const userRole = (session.user.user_metadata?.role as UserRole) || 'captain'
+            const userProfile: UserProfile = {
+              id: session.user.id,
+              email: session.user.email || '',
+              role: userRole,
+              name: session.user.user_metadata?.name || 'Staff User',
+              restaurant_id: session.user.user_metadata?.restaurant_id || '00000000-0000-0000-0000-000000000000',
+              created_at: session.user.created_at,
+            }
+            setProfile(userProfile)
           }
-          setProfile(userProfile)
         } else {
           setUser(null)
           setProfile(null)
@@ -57,16 +73,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         setUser(session.user)
-        const userRole = (session.user.user_metadata?.role as UserRole) || 'captain'
-        const userProfile: UserProfile = {
-          id: session.user.id,
-          email: session.user.email || '',
-          role: userRole,
-          name: session.user.user_metadata?.name || 'Staff User',
-          restaurant_id: session.user.user_metadata?.restaurant_id || 'rest-123',
-          created_at: session.user.created_at,
+        
+        const { data: dbProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        if (dbProfile) {
+          setProfile({
+            id: dbProfile.id,
+            email: dbProfile.email,
+            role: dbProfile.role as UserRole,
+            name: dbProfile.name,
+            restaurant_id: dbProfile.restaurant_id,
+            created_at: dbProfile.created_at
+          })
+        } else {
+          const userRole = (session.user.user_metadata?.role as UserRole) || 'captain'
+          const userProfile: UserProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            role: userRole,
+            name: session.user.user_metadata?.name || 'Staff User',
+            restaurant_id: session.user.user_metadata?.restaurant_id || '00000000-0000-0000-0000-000000000000',
+            created_at: session.user.created_at,
+          }
+          setProfile(userProfile)
         }
-        setProfile(userProfile)
       } else {
         setUser(null)
         setProfile(null)

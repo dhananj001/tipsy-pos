@@ -108,7 +108,7 @@ export default function MenuManagementPage() {
 
         const { data: newCats, error: seedCatError } = await supabase
           .from('menu_categories')
-          .insert(seedCategories)
+          .upsert(seedCategories, { onConflict: 'restaurant_id,name' })
           .select()
 
         if (seedCatError) throw seedCatError

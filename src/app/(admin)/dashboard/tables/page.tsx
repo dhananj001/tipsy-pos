@@ -63,7 +63,7 @@ export default function AdminTablesPage() {
 
         const { data: seededData, error: seedError } = await supabase
           .from('tables')
-          .insert(defaultTables)
+          .upsert(defaultTables, { onConflict: 'restaurant_id,number' })
           .select()
 
         if (seedError) throw seedError

@@ -91,7 +91,6 @@ export default function LoginPage() {
               data: {
                 role,
                 name,
-                restaurant_id: 'rest-123',
               }
             }
           })
