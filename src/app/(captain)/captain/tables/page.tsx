@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import { 
   Users, 
   Grid, 
@@ -13,7 +14,8 @@ import {
   X, 
   ChevronRight, 
   AlertCircle,
-  Loader2
+  Loader2,
+  ShoppingBag
 } from 'lucide-react'
 
 interface Table {
@@ -312,6 +314,16 @@ export default function TablesPage() {
 
             {/* Actions Grid */}
             <div className="py-5 space-y-3.5">
+              <div className="pb-3 border-b border-zinc-100 dark:border-zinc-900/60">
+                <Link
+                  href={`/captain/order?tableId=${selectedTable.id}`}
+                  className="flex w-full items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold text-xs shadow-md shadow-amber-500/25 active:scale-[0.98] transition-all text-center"
+                >
+                  <ShoppingBag className="w-4 h-4 text-white shrink-0 animate-bounce" />
+                  Take Order / Manage Cart
+                </Link>
+              </div>
+
               <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest px-1">Configure Table Status</span>
               
               <div className="grid grid-cols-1 gap-2.5">
