@@ -115,32 +115,36 @@ function OrderPageContent() {
 
       // D. Auto-seed Mock Menu if empty or requested
       if ((!catData || catData.length === 0 || !itemData || itemData.length === 0) || forceSeed) {
-        setSeeding(true)
-        await seedMenuData(profile.restaurant_id)
-        
-        // Re-fetch after seeding
-        const { data: seedCat } = await supabase
-          .from('menu_categories')
-          .select('id, name, sort_order')
-          .eq('restaurant_id', profile.restaurant_id)
-          .order('sort_order', { ascending: true })
+        if (profile.role === 'admin' || profile.role === 'manager') {
+          setSeeding(true)
+          await seedMenuData(profile.restaurant_id)
           
-        const { data: seedItem } = await supabase
-          .from('menu_items')
-          .select('id, name, description, price, is_available, printer_type, category_id')
-          .eq('restaurant_id', profile.restaurant_id)
-          .eq('is_available', true)
-          .order('name', { ascending: true })
+          // Re-fetch after seeding
+          const { data: seedCat } = await supabase
+            .from('menu_categories')
+            .select('id, name, sort_order')
+            .eq('restaurant_id', profile.restaurant_id)
+            .order('sort_order', { ascending: true })
+            
+          const { data: seedItem } = await supabase
+            .from('menu_items')
+            .select('id, name, description, price, is_available, printer_type, category_id')
+            .eq('restaurant_id', profile.restaurant_id)
+            .eq('is_available', true)
+            .order('name', { ascending: true })
 
-        setCategories(seedCat || [])
-        setMenuItems(seedItem || [])
+          setCategories(seedCat || [])
+          setMenuItems(seedItem || [])
+        } else {
+          setError("The restaurant menu is currently empty. Please log in as a Manager or Admin to initialize and seed the POS menu items.")
+        }
       } else {
         setCategories(catData as MenuCategory[])
         setMenuItems(itemData as MenuItem[])
       }
 
     } catch (err: any) {
-      console.error('Error fetching POS data:', err)
+      console.error('Error fetching POS data:', err?.message || err)
       setError(err.message || 'Failed to retrieve tables or menu configuration.')
     } finally {
       setLoading(false)
@@ -152,7 +156,12 @@ function OrderPageContent() {
   const seedMenuData = async (restaurantId: string) => {
     try {
       // Clean existing (for safety in force-seed)
-      await supabase.from('menu_categories').delete().eq('restaurant_id', restaurantId)
+      const { error: delErr } = await supabase
+        .from('menu_categories')
+        .delete()
+        .eq('restaurant_id', restaurantId)
+      
+      if (delErr) throw delErr
 
       const categoriesToSeed = [
         { name: 'Drinks', sort_order: 1, restaurant_id: restaurantId },
@@ -166,7 +175,7 @@ function OrderPageContent() {
         .insert(categoriesToSeed)
         .select()
 
-      if (catError || !insertedCats) throw catError
+      if (catError || !insertedCats) throw catError || new Error('Seeding categories returned empty response')
 
       const catMap = new Map(insertedCats.map(c => [c.name, c.id]))
 
@@ -194,9 +203,11 @@ function OrderPageContent() {
         { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'Classic Espresso Tiramisu', description: 'Espresso-soaked ladyfingers, rich whipped egg-free mascarpone mousse & cocoa', price: 8.50, is_available: true, printer_type: 'kitchen' }
       ]
 
-      await supabase.from('menu_items').insert(itemsToSeed)
-    } catch (err) {
-      console.error('Menu seeding exception:', err)
+      const { error: itemError } = await supabase.from('menu_items').insert(itemsToSeed)
+      if (itemError) throw itemError
+    } catch (err: any) {
+      console.error('Menu seeding exception:', err?.message || err)
+      throw err
     }
   }
 
