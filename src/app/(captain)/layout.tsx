@@ -12,22 +12,24 @@ export default function CaptainLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { profile, signOut, loading } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     if (!loading) {
-      if (!profile) {
+      if (!user) {
         router.push('/login')
-      } else if (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager') {
-        router.push('/dashboard')
+      } else if (profile) {
+        if (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager') {
+          router.push('/dashboard')
+        }
       }
     }
-  }, [loading, profile, router])
+  }, [loading, user, profile, router])
 
-  if (loading || !profile || (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager')) {
+  if (loading || !user || !profile || (profile.role !== 'captain' && profile.role !== 'admin' && profile.role !== 'manager')) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">

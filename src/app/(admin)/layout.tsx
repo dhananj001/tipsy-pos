@@ -27,7 +27,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { profile, signOut, loading } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
   const router = useRouter()
@@ -36,15 +36,17 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!loading) {
-      if (!profile) {
+      if (!user) {
         router.push('/login')
-      } else if (profile.role !== 'admin' && profile.role !== 'manager') {
-        router.push('/captain/tables')
+      } else if (profile) {
+        if (profile.role !== 'admin' && profile.role !== 'manager') {
+          router.push('/captain/tables')
+        }
       }
     }
-  }, [loading, profile, router])
+  }, [loading, user, profile, router])
 
-  if (loading || !profile || (profile.role !== 'admin' && profile.role !== 'manager')) {
+  if (loading || !user || !profile || (profile.role !== 'admin' && profile.role !== 'manager')) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">
