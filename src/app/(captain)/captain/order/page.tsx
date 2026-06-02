@@ -344,7 +344,108 @@ function OrderPageContent() {
 
       if (tableErr) throw tableErr
 
-      // D. Order Succeeded! Clean local storage cache, trigger checkmark splash, auto route back
+      // D. ROUTING & ROUTED KOT PRINT JOBS GENERATION
+      // Fetch restaurant name
+      let restaurantName = 'Tipsy POS'
+      try {
+        const { data: restData } = await supabase
+          .from('restaurants')
+          .select('name')
+          .eq('id', profile.restaurant_id)
+          .single()
+        if (restData?.name) {
+          restaurantName = restData.name
+        }
+      } catch (e) {
+        console.error('Failed to fetch restaurant name for KOT:', e)
+      }
+
+      // Fetch active printers for the restaurant
+      const { data: printers, error: printersErr } = await supabase
+        .from('printers')
+        .select('id, name, type, is_active')
+        .eq('restaurant_id', profile.restaurant_id)
+        .eq('is_active', true)
+
+      if (printersErr) {
+        console.error('Failed to fetch printers for routing:', printersErr)
+      }
+
+      // Group cart items by printer_type (kitchen/bar)
+      const itemsByPrinterType: Record<string, typeof cart> = {}
+      cart.forEach(item => {
+        const pType = item.menuItem.printer_type || 'kitchen'
+        if (!itemsByPrinterType[pType]) {
+          itemsByPrinterType[pType] = []
+        }
+        itemsByPrinterType[pType].push(item)
+      })
+
+      // Generate print jobs for each printer type group
+      const printJobsToInsert: any[] = []
+
+      for (const [printerType, groupedItems] of Object.entries(itemsByPrinterType)) {
+        if (groupedItems.length === 0) continue
+
+        // Resolve matching printers
+        let matchedPrinters = printers?.filter(p => p.type === printerType) || []
+
+        // Fallback routing: if no printer found for type (e.g. bar), send to kitchen printer or any active printer
+        if (matchedPrinters.length === 0 && printers && printers.length > 0) {
+          console.warn(`No active printers found for type [${printerType}]. Attempting fallback routing...`)
+          const kitchenPrinter = printers.find(p => p.type === 'kitchen')
+          matchedPrinters = kitchenPrinter ? [kitchenPrinter] : [printers[0]]
+        }
+
+        // If still no printers, skip and log warning
+        if (matchedPrinters.length === 0) {
+          console.error(`No printers configured at all. Could not schedule KOT for [${printerType}] items.`)
+          continue
+        }
+
+        // Format KOT slip payload
+        const kotPayload = {
+          type: 'KOT',
+          restaurantName,
+          tableName: 'Table',
+          tableNumber: String(table.number),
+          captainName: profile.name || 'Captain',
+          kotNumber: `KOT-${newOrder.id.substring(0, 5).toUpperCase()}`,
+          orderId: newOrder.id,
+          timestamp: new Date().toISOString(),
+          items: groupedItems.map(i => ({
+            name: i.menuItem.name,
+            quantity: i.quantity,
+            notes: i.notes || ''
+          }))
+        }
+
+        // Create job for each matching printer
+        matchedPrinters.forEach(printer => {
+          printJobsToInsert.push({
+            restaurant_id: profile.restaurant_id,
+            printer_id: printer.id,
+            payload: kotPayload,
+            status: 'pending',
+            attempts: 0
+          })
+        })
+      }
+
+      // Insert print jobs in Supabase (will trigger the local print server via Realtime!)
+      if (printJobsToInsert.length > 0) {
+        const { error: printJobsErr } = await supabase
+          .from('print_jobs')
+          .insert(printJobsToInsert)
+
+        if (printJobsErr) {
+          console.error('Failed to submit KOT print jobs:', printJobsErr)
+        } else {
+          console.log(`Successfully scheduled ${printJobsToInsert.length} KOT print jobs.`)
+        }
+      }
+
+      // E. Order Succeeded! Clean local storage cache, trigger checkmark splash, auto route back
       updateCartState([])
       setIsCartOpen(false)
       setSuccess(true)
