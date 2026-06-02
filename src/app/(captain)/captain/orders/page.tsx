@@ -346,7 +346,7 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="text-right flex flex-col items-end gap-1">
-                  <span className="text-xs font-black tracking-tight">${order.total_amount.toFixed(2)}</span>
+                  <span className="text-xs font-black tracking-tight">₹{order.total_amount.toFixed(2)}</span>
                   <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusColor(order.status)}`}>
                     {order.status}
                   </span>
@@ -408,11 +408,11 @@ export default function OrdersPage() {
                     <div>
                       <h4 className="text-xs font-black text-foreground">{item.menu_items?.name || 'Deleted Dish'}</h4>
                       <p className="text-[9.5px] font-bold text-muted-foreground mt-0.5">
-                        Qty: {item.quantity} × ${item.price_at_order.toFixed(2)}
+                        Qty: {item.quantity} × ₹{item.price_at_order.toFixed(2)}
                       </p>
                     </div>
                     <span className="text-xs font-black text-foreground">
-                      ${(item.price_at_order * item.quantity).toFixed(2)}
+                      ₹{(item.price_at_order * item.quantity).toFixed(2)}
                     </span>
                   </div>
 
@@ -429,7 +429,7 @@ export default function OrdersPage() {
             {/* Pricing Summary */}
             <div className="border-t border-zinc-150 dark:border-zinc-900 pt-3 pb-4 shrink-0 flex justify-between items-center px-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total KOT Bill</span>
-              <span className="text-base font-black text-amber-500">${selectedOrder.total_amount.toFixed(2)}</span>
+              <span className="text-base font-black text-amber-500">₹{selectedOrder.total_amount.toFixed(2)}</span>
             </div>
 
             {/* Quick Status State Transitions actions */}

@@ -593,7 +593,31 @@ function OrderPageContent() {
 
       {/* 4. Menu Items Vertical Touch Panel */}
       <div className="flex-1 space-y-3.5">
-        {filteredMenuItems.length === 0 ? (
+        {menuItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center border border-zinc-250 dark:border-zinc-900 rounded-3xl space-y-4 mt-4 bg-zinc-50/50 dark:bg-zinc-900/10">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 animate-pulse">
+              <Sparkles className="w-6 h-6 animate-spin duration-1000" style={{ animationDuration: '4s' }} />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-foreground uppercase tracking-wider">POS Menu is Empty</h3>
+              <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto leading-relaxed">
+                The standard restaurant menu hasn't been initialized in this sandbox yet.
+              </p>
+            </div>
+            <div className="p-4 bg-background border border-zinc-200 dark:border-zinc-900 rounded-2xl text-[10px] text-left max-w-xs space-y-2 text-muted-foreground font-semibold">
+              <p className="font-bold text-foreground text-[10.5px]">💡 How to seed the menu:</p>
+              <p>1. Log out of this Captain account.</p>
+              <p>2. Log back in as an <strong className="text-foreground font-bold">Admin</strong> or <strong className="text-foreground font-bold">Manager</strong>.</p>
+              <p>3. Go to the <strong className="text-foreground font-bold">Menu Management</strong> dashboard to trigger standard auto-seeding automatically.</p>
+            </div>
+            <Link
+              href="/login"
+              className="inline-flex px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-100 font-extrabold rounded-xl text-xs transition-all cursor-pointer select-none active:scale-95"
+            >
+              Sign Out to Switch Account
+            </Link>
+          </div>
+        ) : filteredMenuItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border-2 border-dashed border-zinc-200 dark:border-zinc-900 rounded-3xl space-y-2 mt-4">
             <ClipboardList className="w-8 h-8 opacity-45" />
             <p className="text-xs font-semibold">No items match your filters</p>
@@ -643,7 +667,7 @@ function OrderPageContent() {
                     )}
 
                     <div className="text-sm font-black text-foreground pt-0.5">
-                      ${item.price.toFixed(2)}
+                      ₹{item.price.toFixed(2)}
                     </div>
                   </div>
 
@@ -733,7 +757,7 @@ function OrderPageContent() {
               </div>
               <div className="text-left">
                 <span className="text-[9px] font-bold text-zinc-400 block uppercase tracking-wider">Review Cart</span>
-                <span className="text-xs font-black">${cartSubtotal.toFixed(2)} subtotal</span>
+                <span className="text-xs font-black">₹{cartSubtotal.toFixed(2)} subtotal</span>
               </div>
             </div>
 
@@ -792,7 +816,7 @@ function OrderPageContent() {
                     <div>
                       <h4 className="text-xs font-black text-foreground">{c.menuItem.name}</h4>
                       <p className="text-[10px] font-bold text-muted-foreground mt-0.5">
-                        ${c.menuItem.price.toFixed(2)} each
+                        ₹{c.menuItem.price.toFixed(2)} each
                       </p>
                     </div>
 
@@ -819,7 +843,7 @@ function OrderPageContent() {
                       </div>
 
                       <div className="text-xs font-black w-14 text-right">
-                        ${(c.menuItem.price * c.quantity).toFixed(2)}
+                        ₹{(c.menuItem.price * c.quantity).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -843,16 +867,16 @@ function OrderPageContent() {
             <div className="border-t border-zinc-150 dark:border-zinc-900 pt-4 pb-5 space-y-2 shrink-0">
               <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
                 <span>Cart Subtotal</span>
-                <span className="font-bold text-foreground">${cartSubtotal.toFixed(2)}</span>
+                <span className="font-bold text-foreground">₹{cartSubtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
                 <span>Tax (5% GST Mock)</span>
-                <span className="font-bold text-foreground">${cartTax.toFixed(2)}</span>
+                <span className="font-bold text-foreground">₹{cartTax.toFixed(2)}</span>
               </div>
               
               <div className="flex justify-between text-xs font-black text-foreground pt-1 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
                 <span className="uppercase tracking-wider">Total Bill Amount</span>
-                <span className="text-sm font-black text-amber-500">${cartTotal.toFixed(2)}</span>
+                <span className="text-sm font-black text-amber-500">₹{cartTotal.toFixed(2)}</span>
               </div>
             </div>
 

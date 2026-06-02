@@ -481,7 +481,7 @@ export default function TablesPage() {
                   
                   {mockTotals > 0 && (
                     <span className="absolute bottom-2 text-[9px] font-black tracking-tight px-1.5 py-0.5 rounded-md bg-zinc-950/5 dark:bg-white/5">
-                      ${mockTotals.toFixed(2)}
+                      ₹{mockTotals.toFixed(2)}
                     </span>
                   )}
                 </>
@@ -559,7 +559,7 @@ export default function TablesPage() {
                               <span>{item.name}</span>
                             </div>
                             <div className="font-black text-foreground">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              ₹{(item.price * item.quantity).toFixed(2)}
                             </div>
                           </div>
                         ))}
@@ -569,15 +569,15 @@ export default function TablesPage() {
                       <div className="border-t border-b border-zinc-150 dark:border-zinc-900 py-3.5 space-y-2">
                         <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
                           <span>Subtotal</span>
-                          <span className="font-bold text-foreground">${subtotal.toFixed(2)}</span>
+                          <span className="font-bold text-foreground">₹{subtotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
                           <span>GST (5% tax)</span>
-                          <span className="font-bold text-foreground">${taxAmount.toFixed(2)}</span>
+                          <span className="font-bold text-foreground">₹{taxAmount.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-xs font-black text-foreground pt-1.5 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
                           <span className="uppercase tracking-wider">Grand Total Amount</span>
-                          <span className="text-sm font-black text-amber-500">${grandTotal.toFixed(2)}</span>
+                          <span className="text-sm font-black text-amber-500">₹{grandTotal.toFixed(2)}</span>
                         </div>
                       </div>
 

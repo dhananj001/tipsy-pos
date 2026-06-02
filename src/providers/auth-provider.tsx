@@ -130,13 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login')
   }
 
-  const value: AuthContextType = {
+  const value = React.useMemo(() => ({
     user,
     profile,
     loading,
     role: profile?.role || null,
     signOut,
-  }
+  }), [user, profile, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

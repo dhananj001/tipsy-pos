@@ -302,9 +302,15 @@ BEGIN
 
     -- If restaurant_id is null, automatically seed/assign a default demo restaurant
     IF v_restaurant_id IS NULL THEN
-        INSERT INTO public.restaurants (name)
-        VALUES ('Tipsy POS Sandbox')
-        RETURNING id INTO v_restaurant_id;
+        -- Look up the existing default sandbox restaurant first
+        SELECT id INTO v_restaurant_id FROM public.restaurants WHERE name = 'Tipsy POS Sandbox' LIMIT 1;
+        
+        -- Only create a new one if it doesn't exist
+        IF v_restaurant_id IS NULL THEN
+            INSERT INTO public.restaurants (name)
+            VALUES ('Tipsy POS Sandbox')
+            RETURNING id INTO v_restaurant_id;
+        END IF;
     END IF;
 
     -- Insert profile

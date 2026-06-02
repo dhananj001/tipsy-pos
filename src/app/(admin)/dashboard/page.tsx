@@ -250,7 +250,7 @@ export default function AdminDashboardPage() {
   }
 
   const cards = [
-    { title: 'Total Sales', value: `$${stats.totalSales.toFixed(2)}`, desc: 'Live cash register total', icon: DollarSign, color: 'text-emerald-500 bg-emerald-500/10' },
+    { title: 'Total Sales', value: `₹${stats.totalSales.toFixed(2)}`, desc: 'Live cash register total', icon: DollarSign, color: 'text-emerald-500 bg-emerald-500/10' },
     { title: 'Active Tables', value: `${stats.activeTablesCount} / ${stats.totalTablesCount}`, desc: `${Math.round((stats.activeTablesCount / stats.totalTablesCount) * 100) || 0}% Occupancy rate`, icon: Grid, color: 'text-blue-500 bg-blue-500/10' },
     { title: 'Live Orders', value: `${stats.runningOrdersCount} Running`, desc: 'Active in kitchen queue', icon: ClipboardList, color: 'text-amber-500 bg-amber-500/10' },
     { title: 'Active Staff', value: `${stats.staffCount} Captains`, desc: 'Waitservice members active', icon: Users, color: 'text-indigo-500 bg-indigo-500/10' },
@@ -331,7 +331,7 @@ export default function AdminDashboardPage() {
                   <p className="text-[10px] text-muted-foreground font-mono">{tx.id} • {tx.method.toUpperCase()}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-extrabold text-foreground">${tx.amount.toFixed(2)}</p>
+                  <p className="font-extrabold text-foreground">₹{tx.amount.toFixed(2)}</p>
                   <p className="text-[9px] text-muted-foreground">{tx.time}</p>
                 </div>
               </div>

@@ -477,7 +477,7 @@ export default function MenuManagementPage() {
                             {categoryName}
                           </span>
                         </td>
-                        <td className="p-4 font-black">${item.price.toFixed(2)}</td>
+                        <td className="p-4 font-black">₹{item.price.toFixed(2)}</td>
                         <td className="p-4 uppercase font-bold text-[10px] tracking-wider text-zinc-500 flex items-center gap-1.5 mt-2.5">
                           <Printer className="w-3.5 h-3.5" />
                           {item.printer_type}
@@ -623,7 +623,7 @@ export default function MenuManagementPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" /> Price ($) *
+                    <DollarSign className="w-3 h-3" /> Price (₹) *
                   </label>
                   <input
                     type="text"

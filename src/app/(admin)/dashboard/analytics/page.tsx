@@ -248,7 +248,7 @@ export default function AnalyticsDashboard() {
         <div className="p-5 rounded-2xl bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 flex items-center justify-between shadow-sm relative overflow-hidden text-white group">
           <div className="space-y-1.5 z-10">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Total Sales Revenue</span>
-            <p className="text-2xl font-black">${data.totalSales.toFixed(2)}</p>
+            <p className="text-2xl font-black">₹{data.totalSales.toFixed(2)}</p>
             <span className="text-[9px] text-emerald-400 flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-emerald-400" /> Active cashflow live
             </span>
@@ -286,7 +286,7 @@ export default function AnalyticsDashboard() {
         <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-900 flex items-center justify-between shadow-sm group">
           <div className="space-y-1.5">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">Avg Transaction Value</span>
-            <p className="text-2xl font-black text-foreground">${data.avgTicketSize.toFixed(2)}</p>
+            <p className="text-2xl font-black text-foreground">₹{data.avgTicketSize.toFixed(2)}</p>
             <span className="text-[9px] text-muted-foreground block">Revenue per invoice</span>
           </div>
           <div className="p-3 bg-zinc-100 dark:bg-zinc-900 rounded-xl group-hover:scale-110 transition-transform">
@@ -356,7 +356,7 @@ export default function AnalyticsDashboard() {
                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
                   UPI (Realtime)
                 </span>
-                <span>${data.paymentMethodTotals.upi.toFixed(2)} ({getPercent(data.paymentMethodTotals.upi)}%)</span>
+                <span>₹{data.paymentMethodTotals.upi.toFixed(2)} ({getPercent(data.paymentMethodTotals.upi)}%)</span>
               </div>
               <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
                 <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${getPercent(data.paymentMethodTotals.upi)}%` }}></div>
@@ -370,7 +370,7 @@ export default function AnalyticsDashboard() {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
                   Cash Counter
                 </span>
-                <span>${data.paymentMethodTotals.cash.toFixed(2)} ({getPercent(data.paymentMethodTotals.cash)}%)</span>
+                <span>₹{data.paymentMethodTotals.cash.toFixed(2)} ({getPercent(data.paymentMethodTotals.cash)}%)</span>
               </div>
               <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${getPercent(data.paymentMethodTotals.cash)}%` }}></div>
@@ -384,7 +384,7 @@ export default function AnalyticsDashboard() {
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
                   Credit/Debit Card
                 </span>
-                <span>${data.paymentMethodTotals.card.toFixed(2)} ({getPercent(data.paymentMethodTotals.card)}%)</span>
+                <span>₹{data.paymentMethodTotals.card.toFixed(2)} ({getPercent(data.paymentMethodTotals.card)}%)</span>
               </div>
               <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${getPercent(data.paymentMethodTotals.card)}%` }}></div>
@@ -426,7 +426,7 @@ export default function AnalyticsDashboard() {
                     />
                   </div>
                   <div className="w-24 text-right font-mono font-extrabold text-[11px]">
-                    {item.quantity} units (${item.sales.toFixed(2)})
+                    {item.quantity} units (₹{item.sales.toFixed(2)})
                   </div>
                 </div>
               )

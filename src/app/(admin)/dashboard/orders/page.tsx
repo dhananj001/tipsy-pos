@@ -359,7 +359,7 @@ export default function AdminOrdersPage() {
 
                 <div className="flex items-center justify-between w-full pt-3 border-t border-zinc-100 dark:border-zinc-900 mt-2 text-xs font-bold text-foreground">
                   <span className="text-muted-foreground font-semibold">Total Amount</span>
-                  <span className="text-indigo-500 font-black">${order.total_amount.toFixed(2)}</span>
+                  <span className="text-indigo-500 font-black">₹{order.total_amount.toFixed(2)}</span>
                 </div>
               </button>
             )
@@ -414,11 +414,11 @@ export default function AdminOrdersPage() {
                       <div>
                         <h4 className="text-xs font-black text-foreground">{item.menu_items?.name || 'Deleted Dish'}</h4>
                         <p className="text-[10px] font-bold text-muted-foreground mt-0.5">
-                          Qty: {item.quantity} × ${item.price_at_order.toFixed(2)}
+                          Qty: {item.quantity} × ₹{item.price_at_order.toFixed(2)}
                         </p>
                       </div>
                       <span className="text-xs font-black text-foreground">
-                        ${(item.price_at_order * item.quantity).toFixed(2)}
+                        ₹{(item.price_at_order * item.quantity).toFixed(2)}
                       </span>
                     </div>
 
@@ -435,7 +435,7 @@ export default function AdminOrdersPage() {
               {/* Pricing Summary */}
               <div className="border-t border-zinc-100 dark:border-zinc-900 pt-3 pb-2 shrink-0 flex justify-between items-center px-1">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total KOT Bill</span>
-                <span className="text-lg font-black text-indigo-500">${selectedOrder.total_amount.toFixed(2)}</span>
+                <span className="text-lg font-black text-indigo-500">₹{selectedOrder.total_amount.toFixed(2)}</span>
               </div>
 
               {/* Status State Transitions */}
