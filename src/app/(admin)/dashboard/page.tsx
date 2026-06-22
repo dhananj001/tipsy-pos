@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -114,30 +114,33 @@ export default function AdminDashboardPage() {
   }, [])
 
   // 2. Fetch live metrics from Database
-  const fetchDashboardData = async (showSyncState = false) => {
-    if (!profile?.restaurant_id) return
+  const fetchDashboardData = useCallback(async (showSyncState = false) => {
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
     if (showSyncState) setSyncing(true)
+
+    const supabaseClient = createClient()
 
     try {
       // Query A: Payments (Total sales + Recent invoices)
-      const { data: payments, error: payErr } = await supabase
+      const { data: payments, error: payErr } = await supabaseClient
         .from('payments')
         .select('id, amount, method, created_at, order_id')
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
 
       if (payErr) throw payErr
 
       // Query B: Table layouts
-      const { data: tables, error: tableErr } = await supabase
+      const { data: tables, error: tableErr } = await supabaseClient
         .from('tables')
         .select('status, number')
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
 
       if (tableErr) throw tableErr
 
       // Query C: Running live orders (status = preparing or ready)
-      const { data: orders, error: orderErr } = await supabase
+      const { data: orders, error: orderErr } = await supabaseClient
         .from('orders')
         .select(`
           id,
@@ -152,23 +155,23 @@ export default function AdminDashboardPage() {
             menu_items (name)
           )
         `)
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
         .in('status', ['preparing', 'ready'])
         .order('created_at', { ascending: true })
 
       if (orderErr) throw orderErr
 
       // Query D: Active Captain Staff
-      const { data: profiles, error: profErr } = await supabase
+      const { data: profiles, error: profErr } = await supabaseClient
         .from('users')
         .select('role')
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
         .eq('role', 'captain')
 
       if (profErr) throw profErr
 
       // Query E: Top sellers menu items
-      const { data: orderItems, error: itemsErr } = await supabase
+      const { data: orderItems, error: itemsErr } = await supabaseClient
         .from('order_items')
         .select(`
           quantity,
@@ -177,7 +180,7 @@ export default function AdminDashboardPage() {
             category_id
           )
         `)
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
 
       if (itemsErr) throw itemsErr
 
@@ -193,7 +196,7 @@ export default function AdminDashboardPage() {
       const orderItemsMap: Record<string, Array<{ name: string; quantity: number; price: number }>> = {}
 
       if (orderIds.length > 0) {
-        const { data: ordersData } = await supabase
+        const { data: ordersData } = await supabaseClient
           .from('orders')
           .select(`
             id,
@@ -426,29 +429,30 @@ export default function AdminDashboardPage() {
       setLoading(false)
       setSyncing(false)
     }
-  }
+  }, [profile?.restaurant_id])
 
   // Realtime listening hooks for active POS updates
   useEffect(() => {
-    if (!profile?.restaurant_id) return
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
 
     fetchDashboardData()
 
     const channel = supabase
-      .channel('admin:dashboard:overview')
+      .channel(`admin:dashboard:${restaurantId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${profile.restaurant_id}` },
+        { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${restaurantId}` },
         () => fetchDashboardData()
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` },
+        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
         () => fetchDashboardData()
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${profile.restaurant_id}` },
+        { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${restaurantId}` },
         () => fetchDashboardData()
       )
       .subscribe()
@@ -456,7 +460,7 @@ export default function AdminDashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [profile?.restaurant_id])
+  }, [profile?.restaurant_id, fetchDashboardData])
 
   if (loading) {
     return (

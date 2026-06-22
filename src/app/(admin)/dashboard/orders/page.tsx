@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -54,12 +54,15 @@ export default function AdminOrdersPage() {
   const supabase = createClient()
 
   // 1. Fetch Orders from Database with relations
-  const fetchOrders = async (showSyncState = false) => {
-    if (!profile?.restaurant_id) return
+  const fetchOrders = useCallback(async (showSyncState = false) => {
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
     if (showSyncState) setSyncing(true)
 
+    const supabaseClient = createClient()
+
     try {
-      const { data, error: fetchErr } = await supabase
+      const { data, error: fetchErr } = await supabaseClient
         .from('orders')
         .select(`
           id,
@@ -76,7 +79,7 @@ export default function AdminOrdersPage() {
             menu_items (name)
           )
         `)
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
 
       if (fetchErr) throw fetchErr
@@ -89,27 +92,29 @@ export default function AdminOrdersPage() {
       setLoading(false)
       setSyncing(false)
     }
-  }
+  }, [profile?.restaurant_id])
 
   // 2. Realtime optimized subscription
   useEffect(() => {
-    if (!profile?.restaurant_id) return
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
 
     fetchOrders()
 
-    const channel = supabase
-      .channel(`admin:orders:${profile.restaurant_id}`)
+    const supabaseClient = createClient()
+    const channel = supabaseClient
+      .channel(`admin:orders:${restaurantId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `restaurant_id=eq.${profile.restaurant_id}`,
+          filter: `restaurant_id=eq.${restaurantId}`,
         },
         async (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const { data: updatedOrder, error: singleFetchErr } = await supabase
+            const { data: updatedOrder, error: singleFetchErr } = await supabaseClient
               .from('orders')
               .select(`
                 id,
@@ -149,9 +154,9 @@ export default function AdminOrdersPage() {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabaseClient.removeChannel(channel)
     }
-  }, [profile?.restaurant_id])
+  }, [profile?.restaurant_id, fetchOrders])
 
   // 3. Mutate order status directly
   const handleUpdateStatus = async (orderId: string, newStatus: 'preparing' | 'ready' | 'served' | 'cancelled') => {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -43,39 +43,42 @@ export default function AnalyticsDashboard() {
   const supabase = createClient()
 
   // 1. Fetch and aggregate analytics
-  const fetchAnalytics = async (showSyncState = false) => {
-    if (!profile?.restaurant_id) return
+  const fetchAnalytics = useCallback(async (showSyncState = false) => {
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
     if (showSyncState) setSyncing(true)
+
+    const supabaseClient = createClient()
 
     try {
       // Query A: Payments data for Total Sales, Daily Trend and Payment Methods
-      const { data: payments, error: payErr } = await supabase
+      const { data: payments, error: payErr } = await supabaseClient
         .from('payments')
         .select('amount, method, created_at')
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
 
       if (payErr) throw payErr
 
       // Query B: Active tables counts
-      const { data: tables, error: tableErr } = await supabase
+      const { data: tables, error: tableErr } = await supabaseClient
         .from('tables')
         .select('status')
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
 
       if (tableErr) throw tableErr
       const activeTablesCount = tables?.filter(t => t.status === 'occupied' || t.status === 'billing').length || 0
 
       // Query C: Total orders counts
-      const { count: orderCount, error: orderErr } = await supabase
+      const { count: orderCount, error: orderErr } = await supabaseClient
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
         .neq('status', 'cancelled')
 
       if (orderErr) throw orderErr
 
       // Query D: Top Selling Items aggregation
-      const { data: orderItems, error: itemsErr } = await supabase
+      const { data: orderItems, error: itemsErr } = await supabaseClient
         .from('order_items')
         .select(`
           quantity,
@@ -84,7 +87,7 @@ export default function AnalyticsDashboard() {
             name
           )
         `)
-        .eq('restaurant_id', profile.restaurant_id)
+        .eq('restaurant_id', restaurantId)
 
       if (itemsErr) throw itemsErr
 
@@ -162,32 +165,34 @@ export default function AnalyticsDashboard() {
       setLoading(false)
       setSyncing(false)
     }
-  }
+  }, [profile?.restaurant_id])
 
   // Realtime subscription setup
   useEffect(() => {
-    if (!profile?.restaurant_id) return
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
     fetchAnalytics()
 
+    const supabaseClient = createClient()
     // Listen for new payments or orders to update real-time statistics
-    const channel = supabase
+    const channel = supabaseClient
       .channel('admin:analytics')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${profile.restaurant_id}` },
-        () => fetchAnalytics()
+        { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${restaurantId}` },
+        () => { fetchAnalytics() }
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` },
-        () => fetchAnalytics()
+        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
+        () => { fetchAnalytics() }
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabaseClient.removeChannel(channel)
     }
-  }, [profile?.restaurant_id])
+  }, [profile?.restaurant_id, fetchAnalytics])
 
   if (loading) {
     return (
