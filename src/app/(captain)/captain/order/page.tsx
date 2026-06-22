@@ -53,6 +53,9 @@ interface CartItem {
   notes: string
 }
 
+const MENU_CACHE_KEY = 'tipsy-menu-cache-v1'
+const CACHE_TTL = 15 * 60 * 1000 // 15 minutes
+
 function OrderPageContent() {
   const { profile } = useAuth()
   const router = useRouter()
@@ -77,15 +80,16 @@ function OrderPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
+  const [visibleCount, setVisibleCount] = useState(25)
 
-  // 1. Fetch initial details: Table, Categories, Menu Items
+  // 1. Fetch initial details: Table, Categories, Menu Items (with Client Cache check)
   const fetchData = async (forceSeed = false) => {
     if (!profile?.restaurant_id || !tableId) return
     setLoading(true)
     setError(null)
     
     try {
-      // A. Fetch Selected Table Info
+      // A. Fetch Selected Table Info (Always fresh to check status changes)
       const { data: tableData, error: tableError } = await supabase
         .from('tables')
         .select('id, number, capacity, status')
@@ -95,24 +99,63 @@ function OrderPageContent() {
       if (tableError) throw tableError
       setTable(tableData as Table)
 
-      // B. Fetch Menu Categories
-      const { data: catData, error: catError } = await supabase
-        .from('menu_categories')
-        .select('id, name, sort_order')
-        .eq('restaurant_id', profile.restaurant_id)
-        .order('sort_order', { ascending: true })
+      let catData: MenuCategory[] = []
+      let itemData: MenuItem[] = []
+      let cacheFound = false
 
-      if (catError) throw catError
+      // Check cache first
+      if (!forceSeed) {
+        const cached = localStorage.getItem(`${MENU_CACHE_KEY}-${profile.restaurant_id}`)
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached)
+            if (Date.now() - parsed.timestamp < CACHE_TTL && parsed.categories?.length > 0 && parsed.items?.length > 0) {
+              catData = parsed.categories
+              itemData = parsed.items
+              cacheFound = true
+              
+              // Optimistic UI population to bypass loading screens
+              setCategories(catData)
+              setMenuItems(itemData)
+              setLoading(false)
+            }
+          } catch (e) {
+            console.error('Failed to parse menu cache:', e)
+          }
+        }
+      }
 
-      // C. Fetch Menu Items
-      const { data: itemData, error: itemError } = await supabase
-        .from('menu_items')
-        .select('id, name, description, price, is_available, printer_type, category_id')
-        .eq('restaurant_id', profile.restaurant_id)
-        .eq('is_available', true)
-        .order('name', { ascending: true })
+      // Query database if cache missed or expired
+      if (!cacheFound) {
+        // B. Fetch Menu Categories
+        const { data: fetchCatData, error: catError } = await supabase
+          .from('menu_categories')
+          .select('id, name, sort_order')
+          .eq('restaurant_id', profile.restaurant_id)
+          .order('sort_order', { ascending: true })
 
-      if (itemError) throw itemError
+        if (catError) throw catError
+        catData = fetchCatData as MenuCategory[]
+
+        // C. Fetch Menu Items
+        const { data: fetchItemData, error: itemError } = await supabase
+          .from('menu_items')
+          .select('id, name, description, price, is_available, printer_type, category_id')
+          .eq('restaurant_id', profile.restaurant_id)
+          .eq('is_available', true)
+          .order('name', { ascending: true })
+
+        if (itemError) throw itemError
+        itemData = fetchItemData as MenuItem[]
+
+        // Cache the queried items
+        if (catData.length > 0 && itemData.length > 0) {
+          localStorage.setItem(
+            `${MENU_CACHE_KEY}-${profile.restaurant_id}`,
+            JSON.stringify({ categories: catData, items: itemData, timestamp: Date.now() })
+          )
+        }
+      }
 
       // D. Auto-seed Mock Menu if empty or requested
       if ((!catData || catData.length === 0 || !itemData || itemData.length === 0) || forceSeed) {
@@ -134,14 +177,24 @@ function OrderPageContent() {
             .eq('is_available', true)
             .order('name', { ascending: true })
 
-          setCategories(seedCat || [])
-          setMenuItems(seedItem || [])
+          const newCats = seedCat || []
+          const newItems = seedItem || []
+
+          setCategories(newCats)
+          setMenuItems(newItems)
+
+          if (newCats.length > 0 && newItems.length > 0) {
+            localStorage.setItem(
+              `${MENU_CACHE_KEY}-${profile.restaurant_id}`,
+              JSON.stringify({ categories: newCats, items: newItems, timestamp: Date.now() })
+            )
+          }
         } else {
           setError("The restaurant menu is currently empty. Please log in as a Manager or Admin to initialize and seed the POS menu items.")
         }
       } else {
-        setCategories(catData as MenuCategory[])
-        setMenuItems(itemData as MenuItem[])
+        setCategories(catData)
+        setMenuItems(itemData)
       }
 
     } catch (err: any) {
@@ -224,6 +277,11 @@ function OrderPageContent() {
       fetchData()
     }
   }, [profile?.restaurant_id, tableId])
+
+  // Reset visible items count when category or search changes
+  useEffect(() => {
+    setVisibleCount(25)
+  }, [selectedCategory, searchQuery])
 
   // 2. LocalStorage Caching for persistent cart per table
   useEffect(() => {
@@ -636,118 +694,129 @@ function OrderPageContent() {
             </button>
           </div>
         ) : (
-          filteredMenuItems.map((item) => {
-            const qty = getQuantityInCart(item.id)
-            const notes = getNotesInCart(item.id)
-            const isEditingNotes = editingNotesId === item.id
-            
-            // Tag color by printer routing
-            const printTags = {
-              kitchen: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
-              bar: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-              billing: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-            }[item.printer_type]
+          <>
+            {filteredMenuItems.slice(0, visibleCount).map((item) => {
+              const qty = getQuantityInCart(item.id)
+              const notes = getNotesInCart(item.id)
+              const isEditingNotes = editingNotesId === item.id
+              
+              // Tag color by printer routing
+              const printTags = {
+                kitchen: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+                bar: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+                billing: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+              }[item.printer_type]
 
-            return (
-              <div 
-                key={item.id}
-                className={`flex flex-col p-4.5 rounded-2xl border transition-all duration-200 bg-background ${
-                  qty > 0 
-                    ? 'border-amber-500/40 bg-amber-500/[0.015] shadow-sm shadow-amber-500/5' 
-                    : 'border-zinc-150/80 dark:border-zinc-900 hover:border-zinc-200 dark:hover:border-zinc-850 shadow-none'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  {/* Left content description */}
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-xs font-black text-foreground">{item.name}</h4>
-                      <span className={`text-[8px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded border ${printTags}`}>
-                        {item.printer_type}
-                      </span>
+              return (
+                <div 
+                  key={item.id}
+                  className={`flex flex-col p-4.5 rounded-2xl border transition-all duration-200 bg-background ${
+                    qty > 0 
+                      ? 'border-amber-500/40 bg-amber-500/[0.015] shadow-sm shadow-amber-500/5' 
+                      : 'border-zinc-150/80 dark:border-zinc-900 hover:border-zinc-200 dark:hover:border-zinc-850 shadow-none'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left content description */}
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-black text-foreground">{item.name}</h4>
+                        <span className={`text-[8px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded border ${printTags}`}>
+                          {item.printer_type}
+                        </span>
+                      </div>
+
+                      {item.description && (
+                        <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+
+                      <div className="text-sm font-black text-foreground pt-0.5">
+                        ₹{item.price.toFixed(2)}
+                      </div>
                     </div>
 
-                    {item.description && (
-                      <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
-                        {item.description}
-                      </p>
-                    )}
+                    {/* Right hand chunky Touch quantity controls */}
+                    <div className="flex flex-col items-end shrink-0 justify-center">
+                      {qty === 0 ? (
+                        <button
+                          onClick={() => addToCart(item)}
+                          className="flex h-8 items-center justify-center px-4 rounded-xl border border-zinc-250 bg-background text-xs font-black hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 active:scale-95 transition-all text-foreground cursor-pointer select-none"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          ADD
+                        </button>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="flex items-center h-8 bg-zinc-900 dark:bg-zinc-50 rounded-xl px-1 text-white dark:text-zinc-950 font-black text-xs select-none">
+                            <button
+                              onClick={() => removeFromCart(item.id)}
+                              className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <span className="w-6 text-center text-xs tabular-nums font-bold">
+                              {qty}
+                            </span>
 
-                    <div className="text-sm font-black text-foreground pt-0.5">
-                      ₹{item.price.toFixed(2)}
-                    </div>
-                  </div>
+                            <button
+                              onClick={() => addToCart(item)}
+                              className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
 
-                  {/* Right hand chunky Touch quantity controls */}
-                  <div className="flex flex-col items-end shrink-0 justify-center">
-                    {qty === 0 ? (
-                      <button
-                        onClick={() => addToCart(item)}
-                        className="flex h-8 items-center justify-center px-4 rounded-xl border border-zinc-250 bg-background text-xs font-black hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 active:scale-95 transition-all text-foreground cursor-pointer select-none"
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        ADD
-                      </button>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="flex items-center h-8 bg-zinc-900 dark:bg-zinc-50 rounded-xl px-1 text-white dark:text-zinc-950 font-black text-xs select-none">
+                          {/* Fast inline Notes Toggle */}
                           <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
+                            onClick={() => setEditingNotesId(isEditingNotes ? null : item.id)}
+                            className={`text-[8.5px] font-bold uppercase tracking-wider flex items-center gap-1 py-0.5 px-1.5 rounded transition-all ${
+                              notes 
+                                ? 'text-amber-500 bg-amber-500/10 font-extrabold' 
+                                : 'text-zinc-400 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                            }`}
                           >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          
-                          <span className="w-6 text-center text-xs tabular-nums font-bold">
-                            {qty}
-                          </span>
-
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
+                            <FileText className="w-2.5 h-2.5" />
+                            {notes ? 'Edit Note' : 'Add Note'}
                           </button>
                         </div>
-
-                        {/* Fast inline Notes Toggle */}
-                        <button
-                          onClick={() => setEditingNotesId(isEditingNotes ? null : item.id)}
-                          className={`text-[8.5px] font-bold uppercase tracking-wider flex items-center gap-1 py-0.5 px-1.5 rounded transition-all ${
-                            notes 
-                              ? 'text-amber-500 bg-amber-500/10 font-extrabold' 
-                              : 'text-zinc-400 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900'
-                          }`}
-                        >
-                          <FileText className="w-2.5 h-2.5" />
-                          {notes ? 'Edit Note' : 'Add Note'}
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inline text entry field for individual dish instructions */}
+                  {qty > 0 && isEditingNotes && (
+                    <div className="mt-3.5 pt-3 border-t border-zinc-150/60 dark:border-zinc-900/60 flex items-center gap-2 animate-in fade-in duration-200">
+                      <input
+                        type="text"
+                        placeholder="E.g. No ice, extra spicy, sauce on side..."
+                        value={notes}
+                        onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                        className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 text-[10px] font-semibold px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 text-foreground placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                      />
+                      <button
+                        onClick={() => setEditingNotesId(null)}
+                        className="px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-[10px] font-extrabold active:scale-95 transition-colors cursor-pointer"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  )}
                 </div>
+              )
+            })}
 
-                {/* Inline text entry field for individual dish instructions */}
-                {qty > 0 && isEditingNotes && (
-                  <div className="mt-3.5 pt-3 border-t border-zinc-150/60 dark:border-zinc-900/60 flex items-center gap-2 animate-in fade-in duration-200">
-                    <input
-                      type="text"
-                      placeholder="E.g. No ice, extra spicy, sauce on side..."
-                      value={notes}
-                      onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                      className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 text-[10px] font-semibold px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 text-foreground placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
-                    />
-                    <button
-                      onClick={() => setEditingNotesId(null)}
-                      className="px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-[10px] font-extrabold active:scale-95 transition-colors cursor-pointer"
-                    >
-                      Done
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })
+            {filteredMenuItems.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount((prev) => prev + 25)}
+                className="w-full py-4.5 text-xs text-amber-500 font-extrabold border border-dashed border-amber-500/20 rounded-2xl bg-amber-500/5 hover:bg-amber-500/10 active:scale-98 transition-all cursor-pointer text-center select-none"
+              >
+                Show More Dishes (+{filteredMenuItems.length - visibleCount} items)
+              </button>
+            )}
+          </>
         )}
       </div>
 

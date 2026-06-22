@@ -25,6 +25,7 @@ interface Table {
   capacity: number
   status: 'available' | 'occupied' | 'billing'
   created_at: string
+  orders?: any[]
 }
 
 export default function TablesPage() {
@@ -45,7 +46,7 @@ export default function TablesPage() {
 
   const supabase = createClient()
 
-  // 1. Fetch tables from Supabase
+  // 1. Fetch tables along with active orders from Supabase in a single trip
   const fetchTables = async (showSyncState = false) => {
     if (!profile?.restaurant_id) return
     if (showSyncState) setSyncing(true)
@@ -53,7 +54,25 @@ export default function TablesPage() {
     try {
       const { data, error: fetchError } = await supabase
         .from('tables')
-        .select('*')
+        .select(`
+          *,
+          orders (
+            id,
+            status,
+            total_amount,
+            created_at,
+            order_items (
+              id,
+              quantity,
+              price_at_order,
+              notes,
+              menu_items (
+                name,
+                price
+              )
+            )
+          )
+        `)
         .eq('restaurant_id', profile.restaurant_id)
         .order('number', { ascending: true })
 
@@ -72,7 +91,25 @@ export default function TablesPage() {
         const { data: seededData, error: seedError } = await supabase
           .from('tables')
           .upsert(defaultTables, { onConflict: 'restaurant_id,number' })
-          .select()
+          .select(`
+            *,
+            orders (
+              id,
+              status,
+              total_amount,
+              created_at,
+              order_items (
+                id,
+                quantity,
+                price_at_order,
+                notes,
+                menu_items (
+                  name,
+                  price
+                )
+              )
+            )
+          `)
 
         if (seedError) throw seedError
         if (seededData) setTables(seededData as Table[])
@@ -90,7 +127,7 @@ export default function TablesPage() {
     }
   }
 
-  // Fetch active running orders and their items for the selected table
+  // Fetch active running orders and their items for the selected table (Stale-While-Revalidate background sync)
   const fetchActiveOrders = async (tableId: string) => {
     setFetchingOrders(true)
     try {
@@ -118,6 +155,11 @@ export default function TablesPage() {
 
       if (error) throw error
       setActiveOrders(data || [])
+
+      // Silently update the specific table's orders list in memory to keep it synchronized
+      setTables((prev) =>
+        prev.map((t) => (t.id === tableId ? { ...t, orders: data || [] } : t))
+      )
     } catch (e) {
       console.error('Error fetching table orders:', e)
     } finally {
@@ -125,11 +167,18 @@ export default function TablesPage() {
     }
   }
 
-  // Hook to monitor table selection & fetch their sub-orders
+  // Hook to monitor table selection & fetch their sub-orders (Stale-While-Revalidate)
   useEffect(() => {
     if (selectedTable && selectedTable.status !== 'available') {
-      fetchActiveOrders(selectedTable.id)
+      // Set instantly from pre-fetched nested table orders!
+      const runningOrders = selectedTable.orders?.filter(
+        (o: any) => o.status !== 'cancelled' && o.status !== 'served'
+      ) || []
+      setActiveOrders(runningOrders)
       setBillingMode(false)
+
+      // Background revalidation to guarantee latest state
+      fetchActiveOrders(selectedTable.id)
     } else {
       setActiveOrders([])
       setBillingMode(false)
@@ -305,7 +354,7 @@ export default function TablesPage() {
 
     fetchTables()
 
-    // Subscribe to database changes
+    // Subscribe to database changes for tables status
     const channel = supabase
       .channel('public:tables')
       .on(
@@ -316,7 +365,7 @@ export default function TablesPage() {
           table: 'tables',
           filter: `restaurant_id=eq.${profile.restaurant_id}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             setTables((prev) => {
               if (prev.some((t) => t.id === payload.new.id)) return prev
@@ -324,11 +373,11 @@ export default function TablesPage() {
             })
           } else if (payload.eventType === 'UPDATE') {
             setTables((prev) =>
-              prev.map((t) => (t.id === payload.new.id ? (payload.new as Table) : t))
+              prev.map((t) => (t.id === payload.new.id ? { ...t, ...payload.new } : t))
             )
             // Sync selected table details in modal
             setSelectedTable((prev) => 
-              prev && prev.id === payload.new.id ? (payload.new as Table) : prev
+              prev && prev.id === payload.new.id ? { ...prev, ...payload.new } : prev
             )
           } else if (payload.eventType === 'DELETE') {
             setTables((prev) => prev.filter((t) => t.id !== payload.old.id))
@@ -338,8 +387,27 @@ export default function TablesPage() {
       )
       .subscribe()
 
+    // Subscribe to database changes for orders (for real-time bills and total amounts)
+    const ordersChannel = supabase
+      .channel('public:orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `restaurant_id=eq.${profile.restaurant_id}`,
+        },
+        () => {
+          // Silently sync totals & orders for all tables in the background
+          fetchTables(false)
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
+      supabase.removeChannel(ordersChannel)
     }
   }, [profile?.restaurant_id])
 
@@ -449,12 +517,11 @@ export default function TablesPage() {
             billing: 'bg-blue-500',
           }[table.status]
 
-          // Snapshot mock totals for visualization (Step 4 Indication Requirements)
-          const mockTotals = {
-            available: 0,
-            occupied: [34.50, 58.20, 19.80, 84.90][table.number % 4],
-            billing: [125.00, 78.40, 142.50, 92.00][table.number % 4],
-          }[table.status]
+          // Calculate actual total from active orders
+          const tableOrders = table.orders?.filter(
+            (o: any) => o.status !== 'cancelled' && o.status !== 'served'
+          ) || []
+          const actualTotal = tableOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
 
           const isUpdating = updatingTableId === table.id
 
@@ -479,9 +546,9 @@ export default function TablesPage() {
                     {table.capacity} Pax
                   </span>
                   
-                  {mockTotals > 0 && (
+                  {actualTotal > 0 && (
                     <span className="absolute bottom-2 text-[9px] font-black tracking-tight px-1.5 py-0.5 rounded-md bg-zinc-950/5 dark:bg-white/5">
-                      ₹{mockTotals.toFixed(2)}
+                      ₹{actualTotal.toFixed(2)}
                     </span>
                   )}
                 </>
@@ -514,7 +581,7 @@ export default function TablesPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-foreground">
-                    {billingMode ? `Checkout Invoice T${selectedTable.number}` : `Table #{selectedTable.number} Management`}
+                    {billingMode ? `Checkout Invoice T${selectedTable.number}` : `Table #${selectedTable.number} Management`}
                   </h3>
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Users className="w-3 h-3 text-amber-500" />
