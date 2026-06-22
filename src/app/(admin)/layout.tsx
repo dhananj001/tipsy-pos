@@ -87,13 +87,13 @@ export default function AdminLayout({
         {/* Sidebar Header Brand */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-100 px-4 dark:border-zinc-900">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-extrabold text-white shadow-md shadow-amber-500/20">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-heading font-semibold text-white shadow-md shadow-amber-500/20">
               T
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
-                <span className="text-sm font-bold tracking-tight text-foreground leading-none">Tipsy POS</span>
-                <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-0.5">Control Center</span>
+                <span className="text-sm font-heading font-semibold tracking-tight text-foreground leading-none">Tipsy POS</span>
+                <span className="text-[9px] font-semibold text-amber-600 uppercase tracking-widest mt-1.5">Control Center</span>
               </div>
             )}
           </div>
@@ -124,7 +124,7 @@ export default function AdminLayout({
                 }`}
               >
                 <Icon className="h-4.5 w-4.5 shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
+                {!sidebarCollapsed && <span className="font-sans">{item.label}</span>}
               </Link>
             )
           })}
@@ -134,12 +134,12 @@ export default function AdminLayout({
         <div className="border-t border-zinc-100 p-3 space-y-3 dark:border-zinc-900">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-3 px-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-150 dark:bg-zinc-900 font-extrabold text-sm text-foreground">
+              <div className="flex h-8.5 w-8.5 items-center justify-center rounded-lg bg-zinc-150 dark:bg-zinc-900 font-heading font-semibold text-xs text-foreground">
                 {profile?.name?.charAt(0) || 'A'}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-foreground truncate leading-none">{profile?.name || 'Administrator'}</span>
-                <span className="text-[9px] font-semibold text-muted-foreground uppercase mt-0.5 tracking-wider">{profile?.role || 'admin'}</span>
+                <span className="text-xs font-heading font-semibold text-foreground truncate leading-none">{profile?.name || 'Administrator'}</span>
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase mt-1 tracking-wider">{profile?.role || 'admin'}</span>
               </div>
             </div>
           )}
@@ -197,7 +197,7 @@ export default function AdminLayout({
             
             <div className="h-5 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
             
-            <span className="text-[10px] font-extrabold tracking-widest text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase flex items-center gap-1.5 leading-none">
+            <span className="text-[10px] font-semibold tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase flex items-center gap-1.5 leading-none font-mono">
               <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
               Live Server Connected
             </span>
