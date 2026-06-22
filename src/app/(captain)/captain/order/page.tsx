@@ -33,6 +33,7 @@ interface Table {
 interface MenuCategory {
   id: string
   name: string
+  segment: 'food' | 'cardboard'
   sort_order: number
 }
 
@@ -41,6 +42,7 @@ interface MenuItem {
   name: string
   description: string | null
   price: number
+  variants: Array<{ name: string; price: number }> | null
   is_available: boolean
   printer_type: 'kitchen' | 'bar' | 'billing'
   category_id: string
@@ -48,6 +50,8 @@ interface MenuItem {
 
 interface CartItem {
   menuItem: MenuItem
+  variantName: string | null
+  price: number
   quantity: number
   notes: string
 }
@@ -64,9 +68,11 @@ function OrderPageContent() {
   const [table, setTable] = useState<Table | null>(null)
   const [categories, setCategories] = useState<MenuCategory[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [selectedSegment, setSelectedSegment] = useState<'food' | 'cardboard'>('food')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [cart, setCart] = useState<CartItem[]>([])
+  const [variantSelectionItem, setVariantSelectionItem] = useState<MenuItem | null>(null)
   
   // UI States
   const [loading, setLoading] = useState(true)
@@ -97,7 +103,7 @@ function OrderPageContent() {
       // B. Fetch Menu Categories
       const { data: catData, error: catError } = await supabase
         .from('menu_categories')
-        .select('id, name, sort_order')
+        .select('id, name, segment, sort_order')
         .eq('restaurant_id', profile.restaurant_id)
         .order('sort_order', { ascending: true })
 
@@ -106,42 +112,15 @@ function OrderPageContent() {
       // C. Fetch Menu Items
       const { data: itemData, error: itemError } = await supabase
         .from('menu_items')
-        .select('id, name, description, price, is_available, printer_type, category_id')
+        .select('id, name, description, price, variants, is_available, printer_type, category_id')
         .eq('restaurant_id', profile.restaurant_id)
         .eq('is_available', true)
         .order('name', { ascending: true })
 
       if (itemError) throw itemError
 
-      // D. Auto-seed Mock Menu if empty or requested
-      if ((!catData || catData.length === 0 || !itemData || itemData.length === 0) || forceSeed) {
-        if (profile.role === 'admin' || profile.role === 'manager') {
-          setSeeding(true)
-          await seedMenuData(profile.restaurant_id)
-          
-          // Re-fetch after seeding
-          const { data: seedCat } = await supabase
-            .from('menu_categories')
-            .select('id, name, sort_order')
-            .eq('restaurant_id', profile.restaurant_id)
-            .order('sort_order', { ascending: true })
-            
-          const { data: seedItem } = await supabase
-            .from('menu_items')
-            .select('id, name, description, price, is_available, printer_type, category_id')
-            .eq('restaurant_id', profile.restaurant_id)
-            .eq('is_available', true)
-            .order('name', { ascending: true })
-
-          setCategories(seedCat || [])
-          setMenuItems(seedItem || [])
-        } else {
-          setError("The restaurant menu is currently empty. Please log in as a Manager or Admin to initialize and seed the POS menu items.")
-        }
-      } else {
-        setCategories(catData as MenuCategory[])
-        setMenuItems(itemData as MenuItem[])
-      }
+      setCategories(catData as MenuCategory[])
+      setMenuItems(itemData as MenuItem[])
 
     } catch (err: any) {
       console.error('Error fetching POS data:', err?.message || err)
@@ -152,64 +131,7 @@ function OrderPageContent() {
     }
   }
 
-  // Seeder helper to generate awesome starting menus
-  const seedMenuData = async (restaurantId: string) => {
-    try {
-      // Clean existing (for safety in force-seed)
-      const { error: delErr } = await supabase
-        .from('menu_categories')
-        .delete()
-        .eq('restaurant_id', restaurantId)
-      
-      if (delErr) throw delErr
-
-      const categoriesToSeed = [
-        { name: 'Drinks', sort_order: 1, restaurant_id: restaurantId },
-        { name: 'Starters', sort_order: 2, restaurant_id: restaurantId },
-        { name: 'Mains', sort_order: 3, restaurant_id: restaurantId },
-        { name: 'Desserts', sort_order: 4, restaurant_id: restaurantId },
-      ]
-
-      const { data: insertedCats, error: catError } = await supabase
-        .from('menu_categories')
-        .insert(categoriesToSeed)
-        .select()
-
-      if (catError || !insertedCats) throw catError || new Error('Seeding categories returned empty response')
-
-      const catMap = new Map(insertedCats.map(c => [c.name, c.id]))
-
-      const itemsToSeed = [
-        // Drinks
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Mojito Fresh', description: 'Lime, fresh mint leaves, white rum, brown sugar & sparkling club soda', price: 6.50, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Old Fashioned', description: 'Rich rye whiskey with aromatic bitters & orange zest peel', price: 9.00, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Tipsy IPA Beer', description: 'Locally crafted crisp double-hopped premium IPA', price: 7.00, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Cabernet Red Wine', description: 'Robust, elegant red wine glass with hints of cherry & oak', price: 8.50, is_available: true, printer_type: 'bar' },
-        
-        // Starters
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Buffalo Wings', description: 'Tangy hot buffalo glazed wings served with garlic ranch and celery', price: 10.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Truffle Parm Fries', description: 'Crispy thick fries tossed in white truffle oil, rosemary & shredded parmesan', price: 7.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Tomato Bruschetta', description: 'Grilled farm bread topped with diced vine tomatoes, sweet basil & extra virgin oil', price: 8.00, is_available: true, printer_type: 'kitchen' },
-        
-        // Mains
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Signature POS Burger', description: 'Double flame-grilled angus beef patty, smoked cheddar, garlic aioli & brioche bun', price: 15.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Ribeye Steak House', description: '12oz juicy prime grass-fed steak plated with herb butter & roasted baby potatoes', price: 28.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Porcini Risotto', description: 'Rich, creamy slow-cooked arborio rice loaded with wild porcini and parmesan curls', price: 16.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Woodfire Margherita Pizza', description: 'Artisanal thin sourdough crust, san marzano tomato base, fresh buffalo mozzarella & basil', price: 13.00, is_available: true, printer_type: 'kitchen' },
-        
-        // Desserts
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'Molten Lava Cake', description: 'Warm dark chocolate cake bursting with liquid fudge, vanilla gelato scoop', price: 8.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'NY Strawberry Cheesecake', description: 'Rich, smooth authentic cream cheese cake decorated with wild strawberry glaze', price: 7.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'Classic Espresso Tiramisu', description: 'Espresso-soaked ladyfingers, rich whipped egg-free mascarpone mousse & cocoa', price: 8.50, is_available: true, printer_type: 'kitchen' }
-      ]
-
-      const { error: itemError } = await supabase.from('menu_items').insert(itemsToSeed)
-      if (itemError) throw itemError
-    } catch (err: any) {
-      console.error('Menu seeding exception:', err?.message || err)
-      throw err
-    }
-  }
+  // Auto-seeding helper removed to favor seedMenuAction.
 
   // Load tables & menu on start
   useEffect(() => {
@@ -245,44 +167,43 @@ function OrderPageContent() {
   }
 
   // 3. Cart Manipulations
-  const addToCart = (item: MenuItem) => {
-    const existing = cart.find(c => c.menuItem.id === item.id)
+  const addToCart = (item: MenuItem, variantName: string | null, price: number) => {
+    const existing = cart.find(c => c.menuItem.id === item.id && c.variantName === variantName)
     if (existing) {
       const updated = cart.map(c => 
-        c.menuItem.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
+        (c.menuItem.id === item.id && c.variantName === variantName) ? { ...c, quantity: c.quantity + 1 } : c
       )
       updateCartState(updated)
     } else {
-      const updated = [...cart, { menuItem: item, quantity: 1, notes: '' }]
+      const updated = [...cart, { menuItem: item, variantName, price, quantity: 1, notes: '' }]
       updateCartState(updated)
     }
   }
 
-  const removeFromCart = (itemId: string) => {
-    const existing = cart.find(c => c.menuItem.id === itemId)
+  const removeFromCart = (itemId: string, variantName: string | null) => {
+    const existing = cart.find(c => c.menuItem.id === itemId && c.variantName === variantName)
     if (!existing) return
     
     if (existing.quantity === 1) {
-      const updated = cart.filter(c => c.menuItem.id !== itemId)
+      const updated = cart.filter(c => !(c.menuItem.id === itemId && c.variantName === variantName))
       updateCartState(updated)
     } else {
       const updated = cart.map(c => 
-        c.menuItem.id === itemId ? { ...c, quantity: c.quantity - 1 } : c
+        (c.menuItem.id === itemId && c.variantName === variantName) ? { ...c, quantity: c.quantity - 1 } : c
       )
       updateCartState(updated)
     }
   }
 
-  const updateItemNotes = (itemId: string, notes: string) => {
+  const updateItemNotes = (itemId: string, variantName: string | null, notes: string) => {
     const updated = cart.map(c => 
-      c.menuItem.id === itemId ? { ...c, notes } : c
+      (c.menuItem.id === itemId && c.variantName === variantName) ? { ...c, notes } : c
     )
     updateCartState(updated)
   }
 
   const getQuantityInCart = (itemId: string) => {
-    const item = cart.find(c => c.menuItem.id === itemId)
-    return item ? item.quantity : 0
+    return cart.filter(c => c.menuItem.id === itemId).reduce((sum, c) => sum + c.quantity, 0)
   }
 
   const getNotesInCart = (itemId: string) => {
@@ -290,8 +211,23 @@ function OrderPageContent() {
     return item ? item.notes : ''
   }
 
+  const handleAddClick = (item: MenuItem) => {
+    if (item.variants && item.variants.length > 0) {
+      setVariantSelectionItem(item)
+    } else {
+      addToCart(item, null, item.price)
+    }
+  }
+
+  const handleVariantSelect = (variant: { name: string; price: number }) => {
+    if (variantSelectionItem) {
+      addToCart(variantSelectionItem, variant.name, variant.price)
+      setVariantSelectionItem(null)
+    }
+  }
+
   // Calculations
-  const cartSubtotal = cart.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0)
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   const taxRate = 0.05 // 5% GST standard mock
   const cartTax = cartSubtotal * taxRate
   const cartTotal = cartSubtotal + cartTax
@@ -327,7 +263,8 @@ function OrderPageContent() {
         menu_item_id: c.menuItem.id,
         quantity: c.quantity,
         notes: c.notes || null,
-        price_at_order: c.menuItem.price
+        price_at_order: c.price,
+        variant_name: c.variantName
       }))
 
       const { error: itemsErr } = await supabase
@@ -414,7 +351,7 @@ function OrderPageContent() {
           orderId: newOrder.id,
           timestamp: new Date().toISOString(),
           items: groupedItems.map(i => ({
-            name: i.menuItem.name,
+            name: i.variantName ? `${i.menuItem.name} (${i.variantName})` : i.menuItem.name,
             quantity: i.quantity,
             notes: i.notes || ''
           }))
@@ -464,6 +401,9 @@ function OrderPageContent() {
 
   // Filtering Menu Items
   const filteredMenuItems = menuItems.filter(item => {
+    const itemCategoryObj = categories.find(c => c.id === item.category_id)
+    if (!itemCategoryObj || itemCategoryObj.segment !== selectedSegment) return false
+
     const matchesCategory = selectedCategory === 'all' || item.category_id === selectedCategory
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -563,6 +503,36 @@ function OrderPageContent() {
         )}
       </div>
 
+      {/* Segment Selector */}
+      <div className="grid grid-cols-2 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl mb-4 shrink-0">
+        <button
+          onClick={() => {
+            setSelectedSegment('food')
+            setSelectedCategory('all')
+          }}
+          className={`py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+            selectedSegment === 'food'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Food
+        </button>
+        <button
+          onClick={() => {
+            setSelectedSegment('cardboard')
+            setSelectedCategory('all')
+          }}
+          className={`py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+            selectedSegment === 'cardboard'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Drinks & Cardboard
+        </button>
+      </div>
+
       {/* 3. Horizontal Pill Categories Scroll */}
       <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none shrink-0 select-none">
         <button
@@ -576,7 +546,7 @@ function OrderPageContent() {
           All Items
         </button>
 
-        {categories.map((cat) => (
+        {categories.filter(c => c.segment === selectedSegment).map((cat) => (
           <button
             key={cat.id}
             onClick={() => setSelectedCategory(cat.id)}
@@ -631,8 +601,6 @@ function OrderPageContent() {
         ) : (
           filteredMenuItems.map((item) => {
             const qty = getQuantityInCart(item.id)
-            const notes = getNotesInCart(item.id)
-            const isEditingNotes = editingNotesId === item.id
             
             // Tag color by printer routing
             const printTags = {
@@ -667,7 +635,13 @@ function OrderPageContent() {
                     )}
 
                     <div className="text-sm font-black text-foreground pt-0.5">
-                      ₹{item.price.toFixed(2)}
+                      {item.variants && item.variants.length > 0 ? (
+                        <span className="text-[10px] text-zinc-400 font-bold block">
+                          Multiple variants from ₹{Math.min(...item.variants.map(v => v.price)).toFixed(2)}
+                        </span>
+                      ) : (
+                        `₹${item.price.toFixed(2)}`
+                      )}
                     </div>
                   </div>
 
@@ -675,69 +649,23 @@ function OrderPageContent() {
                   <div className="flex flex-col items-end shrink-0 justify-center">
                     {qty === 0 ? (
                       <button
-                        onClick={() => addToCart(item)}
+                        onClick={() => handleAddClick(item)}
                         className="flex h-8 items-center justify-center px-4 rounded-xl border border-zinc-250 bg-background text-xs font-black hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 active:scale-95 transition-all text-foreground cursor-pointer select-none"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" />
                         ADD
                       </button>
                     ) : (
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="flex items-center h-8 bg-zinc-900 dark:bg-zinc-50 rounded-xl px-1 text-white dark:text-zinc-950 font-black text-xs select-none">
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          
-                          <span className="w-6 text-center text-xs tabular-nums font-bold">
-                            {qty}
-                          </span>
-
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="flex items-center justify-center w-6 h-6 hover:opacity-80 active:scale-75 transition-all shrink-0 cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Fast inline Notes Toggle */}
-                        <button
-                          onClick={() => setEditingNotesId(isEditingNotes ? null : item.id)}
-                          className={`text-[8.5px] font-bold uppercase tracking-wider flex items-center gap-1 py-0.5 px-1.5 rounded transition-all ${
-                            notes 
-                              ? 'text-amber-500 bg-amber-500/10 font-extrabold' 
-                              : 'text-zinc-400 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900'
-                          }`}
-                        >
-                          <FileText className="w-2.5 h-2.5" />
-                          {notes ? 'Edit Note' : 'Add Note'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleAddClick(item)}
+                        className="flex h-8 items-center justify-center px-4 rounded-xl border border-amber-500 bg-amber-500/10 text-xs font-black hover:bg-amber-500/20 active:scale-95 transition-all text-amber-600 cursor-pointer select-none"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        ADD ({qty})
+                      </button>
                     )}
                   </div>
                 </div>
-
-                {/* Inline text entry field for individual dish instructions */}
-                {qty > 0 && isEditingNotes && (
-                  <div className="mt-3.5 pt-3 border-t border-zinc-150/60 dark:border-zinc-900/60 flex items-center gap-2 animate-in fade-in duration-200">
-                    <input
-                      type="text"
-                      placeholder="E.g. No ice, extra spicy, sauce on side..."
-                      value={notes}
-                      onChange={(e) => updateItemNotes(item.id, e.target.value)}
-                      className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 text-[10px] font-semibold px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 text-foreground placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
-                    />
-                    <button
-                      onClick={() => setEditingNotesId(null)}
-                      className="px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-[10px] font-extrabold active:scale-95 transition-colors cursor-pointer"
-                    >
-                      Done
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })
@@ -809,14 +737,21 @@ function OrderPageContent() {
               
               {cart.map((c) => (
                 <div 
-                  key={c.menuItem.id}
+                  key={`${c.menuItem.id}-${c.variantName}`}
                   className="flex flex-col p-3 rounded-xl border border-zinc-150 dark:border-zinc-900/60 bg-zinc-50/25 dark:bg-zinc-950/20 gap-2.5"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h4 className="text-xs font-black text-foreground">{c.menuItem.name}</h4>
+                      <h4 className="text-xs font-black text-foreground">
+                        {c.menuItem.name}
+                        {c.variantName && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-extrabold text-[9px] border border-indigo-500/20">
+                            {c.variantName}
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-[10px] font-bold text-muted-foreground mt-0.5">
-                        ₹{c.menuItem.price.toFixed(2)} each
+                        ₹{c.price.toFixed(2)} each
                       </p>
                     </div>
 
@@ -824,7 +759,7 @@ function OrderPageContent() {
                       {/* Quantity Modifier */}
                       <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 text-foreground font-black text-[11px] h-7">
                         <button
-                          onClick={() => removeFromCart(c.menuItem.id)}
+                          onClick={() => removeFromCart(c.menuItem.id, c.variantName)}
                           className="flex items-center justify-center w-5.5 h-5.5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
                         >
                           <Minus className="w-3 h-3 text-muted-foreground" />
@@ -835,7 +770,7 @@ function OrderPageContent() {
                         </span>
 
                         <button
-                          onClick={() => addToCart(c.menuItem)}
+                          onClick={() => addToCart(c.menuItem, c.variantName, c.price)}
                           className="flex items-center justify-center w-5.5 h-5.5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
                         >
                           <Plus className="w-3 h-3 text-muted-foreground" />
@@ -843,7 +778,7 @@ function OrderPageContent() {
                       </div>
 
                       <div className="text-xs font-black w-14 text-right">
-                        ₹{(c.menuItem.price * c.quantity).toFixed(2)}
+                        ₹{(c.price * c.quantity).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -855,7 +790,7 @@ function OrderPageContent() {
                       type="text"
                       placeholder="Add chef notes (no spice, garlic etc)..."
                       value={c.notes}
-                      onChange={(e) => updateItemNotes(c.menuItem.id, e.target.value)}
+                      onChange={(e) => updateItemNotes(c.menuItem.id, c.variantName, e.target.value)}
                       className="flex-1 bg-transparent text-[10px] font-semibold text-foreground focus:outline-none border-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
                     />
                   </div>
@@ -922,6 +857,41 @@ function OrderPageContent() {
             <p className="text-xs text-muted-foreground font-semibold max-w-xs px-6">
               Order has been created successfully. Redirecting you to tables dashboard...
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Variant Selection Modal */}
+      {variantSelectionItem && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-zinc-950/45 backdrop-blur-sm" onClick={() => setVariantSelectionItem(null)} />
+          <div className="relative z-10 w-full max-w-sm bg-background border border-zinc-200 dark:border-zinc-900 rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900">
+              <div>
+                <h3 className="text-xs font-black uppercase text-muted-foreground tracking-wider">Select Variant</h3>
+                <h4 className="text-sm font-bold text-foreground mt-0.5">{variantSelectionItem.name}</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVariantSelectionItem(null)}
+                className="p-1 rounded-md text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {variantSelectionItem.variants?.map((v, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleVariantSelect(v)}
+                  className="w-full p-4 rounded-2xl border border-zinc-250 bg-background text-left hover:bg-zinc-50 hover:border-amber-500/50 active:scale-[0.98] transition-all flex justify-between items-center cursor-pointer"
+                >
+                  <span className="text-xs font-extrabold text-foreground">{v.name}</span>
+                  <span className="text-xs font-black text-amber-500">₹{v.price.toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

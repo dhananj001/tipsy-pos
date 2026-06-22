@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
+import { seedMenuAction } from '@/app/actions/seed-menu'
 import { 
   BookOpen, 
   Plus, 
@@ -19,11 +20,13 @@ import {
   DollarSign 
 } from 'lucide-react'
 
+
 // Strong TypeScript Definitions
 interface Category {
   id: string
   restaurant_id: string
   name: string
+  segment: 'food' | 'cardboard'
   sort_order: number
   created_at: string
 }
@@ -35,6 +38,7 @@ interface MenuItem {
   name: string
   description: string | null
   price: number
+  variants: Array<{ name: string; price: number }> | null
   is_available: boolean
   printer_type: 'kitchen' | 'bar' | 'billing'
   created_at: string
@@ -70,8 +74,30 @@ export default function MenuManagementPage() {
   const [catErrors, setCatErrors] = useState<Record<string, string>>({})
 
   const [submitting, setSubmitting] = useState(false)
+  const [syncingMenu, setSyncingMenu] = useState(false)
 
   const supabase = createClient()
+
+  const handleSyncMenu = async () => {
+    if (!confirm("This will overwrite existing menu categories and items with the accurate tipsy menu data. Do you want to proceed?")) {
+      return
+    }
+    setSyncingMenu(true)
+    setError(null)
+    try {
+      const res = await seedMenuAction()
+      if (!res.success) {
+        throw new Error(res.error)
+      }
+      alert(res.message)
+      await fetchMenuData()
+    } catch (err: any) {
+      console.error(err)
+      setError(`Sync failed: ${err.message || err}`)
+    } finally {
+      setSyncingMenu(false)
+    }
+  }
 
   // 1. Initial Data Seeding & Fetching
   const fetchMenuData = async () => {
@@ -368,6 +394,19 @@ export default function MenuManagementPage() {
         </div>
 
         <div className="flex gap-2">
+          <button
+            onClick={handleSyncMenu}
+            disabled={syncingMenu}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 bg-background hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-xs font-bold text-muted-foreground hover:text-foreground active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {syncingMenu ? (
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+            ) : (
+              <BookOpen className="w-4 h-4 text-indigo-500" />
+            )}
+            Sync Menu Markdown
+          </button>
+
           {activeTab === 'items' ? (
             <button
               onClick={() => openItemModal()}
@@ -477,7 +516,22 @@ export default function MenuManagementPage() {
                             {categoryName}
                           </span>
                         </td>
-                        <td className="p-4 font-black">₹{item.price.toFixed(2)}</td>
+                        <td className="p-4 font-black">
+                          {item.variants && item.variants.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="text-zinc-400 text-[10px]">Multiple ({item.variants.length})</p>
+                              <div className="flex flex-wrap gap-1">
+                                {item.variants.map((v, i) => (
+                                  <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] text-foreground font-bold">
+                                    {v.name}: ₹{v.price}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            `₹${item.price.toFixed(2)}`
+                          )}
+                        </td>
                         <td className="p-4 uppercase font-bold text-[10px] tracking-wider text-zinc-500 flex items-center gap-1.5 mt-2.5">
                           <Printer className="w-3.5 h-3.5" />
                           {item.printer_type}
@@ -530,6 +584,7 @@ export default function MenuManagementPage() {
               <thead>
                 <tr className="bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-900 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   <th className="p-4">Category Name</th>
+                  <th className="p-4">Segment</th>
                   <th className="p-4">Sort Order Priority</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
@@ -545,6 +600,15 @@ export default function MenuManagementPage() {
                   categories.map((cat) => (
                     <tr key={cat.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20">
                       <td className="p-4 font-bold text-foreground">{cat.name}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          cat.segment === 'food'
+                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                            : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20'
+                        }`}>
+                          {cat.segment === 'food' ? 'Food' : 'Drinks/Cardboard'}
+                        </span>
+                      </td>
                       <td className="p-4 font-mono font-bold text-muted-foreground">{cat.sort_order}</td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-1.5">

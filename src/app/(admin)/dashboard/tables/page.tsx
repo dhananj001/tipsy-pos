@@ -108,6 +108,7 @@ export default function AdminTablesPage() {
             id,
             quantity,
             price_at_order,
+            variant_name,
             notes,
             menu_items (
               name,
@@ -141,16 +142,18 @@ export default function AdminTablesPage() {
 
   // Helper to aggregate running order items for the table bill
   const getAggregatedItems = () => {
-    const itemMap = new Map<string, { name: string; quantity: number; price: number }>()
+    const itemMap = new Map<string, { name: string; quantity: number; price: number; variant_name: string | null }>()
     activeOrders.forEach(order => {
       order.order_items?.forEach((oi: any) => {
-        const name = oi.menu_items?.name || 'Unknown Item'
+        const baseName = oi.menu_items?.name || 'Unknown Item'
+        const variantName = oi.variant_name || null
+        const displayName = variantName ? `${baseName} (${variantName})` : baseName
         const price = oi.price_at_order || 0
-        const existing = itemMap.get(name)
+        const existing = itemMap.get(displayName)
         if (existing) {
           existing.quantity += oi.quantity
         } else {
-          itemMap.set(name, { name, quantity: oi.quantity, price })
+          itemMap.set(displayName, { name: displayName, quantity: oi.quantity, price, variant_name: variantName })
         }
       })
     })

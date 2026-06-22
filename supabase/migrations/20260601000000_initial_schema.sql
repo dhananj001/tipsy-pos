@@ -14,6 +14,8 @@ CREATE TYPE public.printer_type AS ENUM ('kitchen', 'bar', 'billing');
 CREATE TYPE public.payment_method AS ENUM ('cash', 'upi', 'card');
 CREATE TYPE public.payment_status AS ENUM ('pending', 'completed', 'failed');
 CREATE TYPE public.print_status AS ENUM ('pending', 'processing', 'printed', 'failed');
+CREATE TYPE public.menu_segment AS ENUM ('food', 'cardboard');
+
 
 -- ---------------------------------------------------------------------
 -- 2. Create Tables
@@ -57,6 +59,7 @@ CREATE TABLE public.menu_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    segment public.menu_segment NOT NULL DEFAULT 'food',
     sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -71,6 +74,7 @@ CREATE TABLE public.menu_items (
     name TEXT NOT NULL,
     description TEXT,
     price DECIMAL(10, 2) NOT NULL,
+    variants JSONB DEFAULT NULL,
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     printer_type public.printer_type NOT NULL DEFAULT 'kitchen',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -98,6 +102,7 @@ CREATE TABLE public.order_items (
     quantity INT NOT NULL DEFAULT 1,
     notes TEXT,
     price_at_order DECIMAL(10, 2) NOT NULL,
+    variant_name TEXT DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

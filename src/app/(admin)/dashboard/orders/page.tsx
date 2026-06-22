@@ -24,6 +24,7 @@ interface OrderItem {
   quantity: number
   notes: string | null
   price_at_order: number
+  variant_name: string | null
   menu_items: {
     name: string
   } | null
@@ -73,6 +74,7 @@ export default function AdminOrdersPage() {
             quantity,
             notes,
             price_at_order,
+            variant_name,
             menu_items (name)
           )
         `)
@@ -123,6 +125,7 @@ export default function AdminOrdersPage() {
                   quantity,
                   notes,
                   price_at_order,
+                  variant_name,
                   menu_items (name)
                 )
               `)
@@ -412,7 +415,14 @@ export default function AdminOrdersPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="text-xs font-black text-foreground">{item.menu_items?.name || 'Deleted Dish'}</h4>
+                        <h4 className="text-xs font-black text-foreground">
+                          {item.menu_items?.name || 'Deleted Dish'}
+                          {item.variant_name && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-extrabold text-[9px] border border-indigo-500/20">
+                              {item.variant_name}
+                            </span>
+                          )}
+                        </h4>
                         <p className="text-[10px] font-bold text-muted-foreground mt-0.5">
                           Qty: {item.quantity} × ₹{item.price_at_order.toFixed(2)}
                         </p>
