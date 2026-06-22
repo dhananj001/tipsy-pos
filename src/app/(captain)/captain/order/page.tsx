@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
+import { MENU_CATEGORIES, MENU_ITEMS } from '@/lib/menu-data'
 import { 
   ArrowLeft, 
   Search, 
@@ -163,48 +164,54 @@ function OrderPageContent() {
       
       if (delErr) throw delErr
 
-      const categoriesToSeed = [
-        { name: 'Drinks', sort_order: 1, restaurant_id: restaurantId },
-        { name: 'Starters', sort_order: 2, restaurant_id: restaurantId },
-        { name: 'Mains', sort_order: 3, restaurant_id: restaurantId },
-        { name: 'Desserts', sort_order: 4, restaurant_id: restaurantId },
-      ]
+      // A. Seed Categories
+      const categoriesToInsert = MENU_CATEGORIES.map(c => ({
+        restaurant_id: restaurantId,
+        name: c.name,
+        sort_order: c.sort_order
+      }))
 
       const { data: insertedCats, error: catError } = await supabase
         .from('menu_categories')
-        .insert(categoriesToSeed)
+        .insert(categoriesToInsert)
         .select()
 
       if (catError || !insertedCats) throw catError || new Error('Seeding categories returned empty response')
 
       const catMap = new Map(insertedCats.map(c => [c.name, c.id]))
 
-      const itemsToSeed = [
-        // Drinks
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Mojito Fresh', description: 'Lime, fresh mint leaves, white rum, brown sugar & sparkling club soda', price: 6.50, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Old Fashioned', description: 'Rich rye whiskey with aromatic bitters & orange zest peel', price: 9.00, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Tipsy IPA Beer', description: 'Locally crafted crisp double-hopped premium IPA', price: 7.00, is_available: true, printer_type: 'bar' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Drinks'), name: 'Cabernet Red Wine', description: 'Robust, elegant red wine glass with hints of cherry & oak', price: 8.50, is_available: true, printer_type: 'bar' },
-        
-        // Starters
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Buffalo Wings', description: 'Tangy hot buffalo glazed wings served with garlic ranch and celery', price: 10.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Truffle Parm Fries', description: 'Crispy thick fries tossed in white truffle oil, rosemary & shredded parmesan', price: 7.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Starters'), name: 'Tomato Bruschetta', description: 'Grilled farm bread topped with diced vine tomatoes, sweet basil & extra virgin oil', price: 8.00, is_available: true, printer_type: 'kitchen' },
-        
-        // Mains
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Signature POS Burger', description: 'Double flame-grilled angus beef patty, smoked cheddar, garlic aioli & brioche bun', price: 15.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Ribeye Steak House', description: '12oz juicy prime grass-fed steak plated with herb butter & roasted baby potatoes', price: 28.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Porcini Risotto', description: 'Rich, creamy slow-cooked arborio rice loaded with wild porcini and parmesan curls', price: 16.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Mains'), name: 'Woodfire Margherita Pizza', description: 'Artisanal thin sourdough crust, san marzano tomato base, fresh buffalo mozzarella & basil', price: 13.00, is_available: true, printer_type: 'kitchen' },
-        
-        // Desserts
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'Molten Lava Cake', description: 'Warm dark chocolate cake bursting with liquid fudge, vanilla gelato scoop', price: 8.00, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'NY Strawberry Cheesecake', description: 'Rich, smooth authentic cream cheese cake decorated with wild strawberry glaze', price: 7.50, is_available: true, printer_type: 'kitchen' },
-        { restaurant_id: restaurantId, category_id: catMap.get('Desserts'), name: 'Classic Espresso Tiramisu', description: 'Espresso-soaked ladyfingers, rich whipped egg-free mascarpone mousse & cocoa', price: 8.50, is_available: true, printer_type: 'kitchen' }
-      ]
+      // B. Seed Items
+      const itemsToInsert = MENU_ITEMS.map(item => {
+        const cat = MENU_CATEGORIES.find(c => c.name === item.categoryName)
+        const printer_type = item.printer_type || cat?.printer_type || 'kitchen'
+        return {
+          restaurant_id: restaurantId,
+          category_id: catMap.get(item.categoryName),
+          name: item.name,
+          description: item.description || null,
+          price: item.price,
+          is_available: true,
+          printer_type
+        }
+      })
 
-      const { error: itemError } = await supabase.from('menu_items').insert(itemsToSeed)
+      const { error: itemError } = await supabase.from('menu_items').insert(itemsToInsert)
       if (itemError) throw itemError
+
+      // C. Seed Printers if they do not exist
+      const { data: existingPrinters } = await supabase
+        .from('printers')
+        .select('name')
+        .eq('restaurant_id', restaurantId)
+
+      if (!existingPrinters || existingPrinters.length === 0) {
+        const printersToSeed = [
+          { restaurant_id: restaurantId, name: 'counter one', ip_address: '192.168.1.50', port: 9100, type: 'billing', is_active: true },
+          { restaurant_id: restaurantId, name: 'kitchen one', ip_address: '192.168.1.100', port: 9100, type: 'kitchen', is_active: true },
+          { restaurant_id: restaurantId, name: 'bar one', ip_address: '192.168.1.150', port: 9100, type: 'bar', is_active: true }
+        ]
+        await supabase.from('printers').insert(printersToSeed)
+      }
     } catch (err: any) {
       console.error('Menu seeding exception:', err?.message || err)
       throw err

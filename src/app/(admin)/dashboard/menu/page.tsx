@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
+import { MENU_CATEGORIES, MENU_ITEMS } from '@/lib/menu-data'
 import { 
   BookOpen, 
   Plus, 
@@ -25,7 +26,7 @@ interface Category {
   restaurant_id: string
   name: string
   sort_order: number
-  created_at: string
+  created_at?: string
 }
 
 interface MenuItem {
@@ -37,7 +38,7 @@ interface MenuItem {
   price: number
   is_available: boolean
   printer_type: 'kitchen' | 'bar' | 'billing'
-  created_at: string
+  created_at?: string
 }
 
 export default function MenuManagementPage() {
@@ -100,40 +101,59 @@ export default function MenuManagementPage() {
 
       // Auto-Seed Initial Sandbox Menu Data if completely empty
       if ((!catData || catData.length === 0) && (!itemData || itemData.length === 0)) {
-        const seedCategories = [
-          { restaurant_id: profile.restaurant_id, name: 'Mains', sort_order: 1 },
-          { restaurant_id: profile.restaurant_id, name: 'Beverages', sort_order: 2 },
-          { restaurant_id: profile.restaurant_id, name: 'Appetizers', sort_order: 0 }
-        ]
+        const categoriesToInsert = MENU_CATEGORIES.map(c => ({
+          restaurant_id: profile.restaurant_id,
+          name: c.name,
+          sort_order: c.sort_order
+        }))
 
         const { data: newCats, error: seedCatError } = await supabase
           .from('menu_categories')
-          .upsert(seedCategories, { onConflict: 'restaurant_id,name' })
+          .insert(categoriesToInsert)
           .select()
 
-        if (seedCatError) throw seedCatError
+        if (seedCatError || !newCats) throw seedCatError || new Error('Seeding categories returned empty response')
 
-        if (newCats && newCats.length > 0) {
-          const appCat = newCats.find(c => c.name === 'Appetizers')?.id || newCats[0].id
-          const mainCat = newCats.find(c => c.name === 'Mains')?.id || newCats[0].id
-          const bevCat = newCats.find(c => c.name === 'Beverages')?.id || newCats[0].id
+        const catMap = new Map(newCats.map(c => [c.name, c.id]))
 
-          const seedItems = [
-            { restaurant_id: profile.restaurant_id, category_id: appCat, name: 'Garlic Bread', price: 6.99, printer_type: 'kitchen' as const, is_available: true, description: 'Toasted baguette with herb garlic butter' },
-            { restaurant_id: profile.restaurant_id, category_id: mainCat, name: 'Classic Margherita Pizza', price: 14.50, printer_type: 'kitchen' as const, is_available: true, description: 'Fresh mozzarella, san marzano tomatoes, fresh basil' },
-            { restaurant_id: profile.restaurant_id, category_id: bevCat, name: 'Spiced Craft Mojito', price: 9.50, printer_type: 'bar' as const, is_available: true, description: 'Fresh mint, spiced rum, raw lime juice, sparkling water' }
+        const itemsToInsert = MENU_ITEMS.map(item => {
+          const cat = MENU_CATEGORIES.find(c => c.name === item.categoryName)
+          const printer_type = item.printer_type || cat?.printer_type || 'kitchen'
+          return {
+            restaurant_id: profile.restaurant_id,
+            category_id: catMap.get(item.categoryName),
+            name: item.name,
+            description: item.description || null,
+            price: item.price,
+            is_available: true,
+            printer_type
+          }
+        })
+
+        const { error: seedItemError } = await supabase
+          .from('menu_items')
+          .insert(itemsToInsert)
+
+        if (seedItemError) throw seedItemError
+
+        // Also seed printers if they do not exist
+        const { data: existingPrinters } = await supabase
+          .from('printers')
+          .select('name')
+          .eq('restaurant_id', profile.restaurant_id)
+
+        if (!existingPrinters || existingPrinters.length === 0) {
+          const printersToSeed = [
+            { restaurant_id: profile.restaurant_id, name: 'counter one', ip_address: '192.168.1.50', port: 9100, type: 'billing', is_active: true },
+            { restaurant_id: profile.restaurant_id, name: 'kitchen one', ip_address: '192.168.1.100', port: 9100, type: 'kitchen', is_active: true },
+            { restaurant_id: profile.restaurant_id, name: 'bar one', ip_address: '192.168.1.150', port: 9100, type: 'bar', is_active: true }
           ]
-
-          const { error: seedItemError } = await supabase
-            .from('menu_items')
-            .insert(seedItems)
-
-          if (seedItemError) throw seedItemError
-          
-          // Re-fetch clean copy
-          fetchMenuData()
-          return
+          await supabase.from('printers').insert(printersToSeed)
         }
+        
+        // Re-fetch clean copy
+        fetchMenuData()
+        return
       }
 
       setCategories(catData || [])
