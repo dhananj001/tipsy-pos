@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -16,7 +17,8 @@ import {
   Tag, 
   Layers, 
   Printer, 
-  DollarSign 
+  DollarSign,
+  FileSpreadsheet
 } from 'lucide-react'
 
 // Strong TypeScript Definitions
@@ -368,6 +370,13 @@ export default function MenuManagementPage() {
         </div>
 
         <div className="flex gap-2">
+          <Link
+            href="/dashboard/menu/import"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-background/50 hover:bg-zinc-50 text-zinc-600 dark:text-zinc-300 text-xs font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Import Excel
+          </Link>
           {activeTab === 'items' ? (
             <button
               onClick={() => openItemModal()}
