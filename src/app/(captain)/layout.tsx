@@ -42,7 +42,7 @@ export default function CaptainLayout({
 
   const navItems = [
     { label: 'Tables', href: '/captain/tables', icon: Grid },
-    { label: 'Orders', href: '/captain/orders', icon: ClipboardList },
+    { label: 'Bills', href: '/captain/orders', icon: ClipboardList },
     { label: 'Profile', href: '/captain/profile', icon: User },
   ]
 

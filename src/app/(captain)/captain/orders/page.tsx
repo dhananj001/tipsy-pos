@@ -1,32 +1,50 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Users, 
-  ClipboardList, 
   RefreshCw, 
   Clock, 
   AlertCircle, 
   X, 
   Loader2, 
   CheckCircle2, 
-  Coffee, 
-  ChevronRight,
+  FileText, 
+  Printer,
+  Search,
+  Percent,
+  Coins,
+  ArrowRight,
   TrendingUp,
-  XCircle,
-  Play
+  Tag,
+  Plus,
+  Minus,
+  Calendar,
+  Layers,
+  ChevronRight,
+  Filter
 } from 'lucide-react'
+
+interface MenuItem {
+  name: string
+  printer_type: 'kitchen' | 'bar' | 'billing'
+}
 
 interface OrderItem {
   id: string
   quantity: number
   notes: string | null
   price_at_order: number
-  menu_items: {
-    name: string
-  } | null
+  menu_items: MenuItem | null
+}
+
+interface Payment {
+  id: string
+  amount: number
+  method: 'cash' | 'upi' | 'card'
+  status: string
 }
 
 interface Order {
@@ -36,33 +54,52 @@ interface Order {
   created_at: string
   table_id: string
   tables: {
+    id: string
     number: number
   } | null
   order_items: OrderItem[]
+  payments: Payment[]
 }
 
-export default function OrdersPage() {
+export default function GroupedBillsHistoryPage() {
   const { profile } = useAuth()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [bills, setBills] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'preparing' | 'ready' | 'served'>('all')
+
+  // Filters & Search States
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'settled'>('all')
+
+  // Drawer / Editing States
+  const [selectedBill, setSelectedBill] = useState<Order | null>(null)
+  const [savingBill, setSavingBill] = useState(false)
+
+  // Edit Bill States
+  const [taxPercent, setTaxPercent] = useState<number>(5)
+  const [discountPercent, setDiscountPercent] = useState<number>(0)
+  const [serviceChargePercent, setServiceChargePercent] = useState<number>(0)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
 
   const supabase = createClient()
 
-  // 1. Fetch Orders from Database with relations
-  const fetchOrders = useCallback(async (showSyncState = false) => {
+  // Start of today helper
+  const getStartOfToday = () => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString()
+  }
+
+  // 1. Fetch orders of today
+  const fetchBillsHistory = useCallback(async (showSyncState = false) => {
     const restaurantId = profile?.restaurant_id
     if (!restaurantId) return
     if (showSyncState) setSyncing(true)
 
-    const supabaseClient = createClient()
-
     try {
-      const { data, error: fetchErr } = await supabaseClient
+      const startOfToday = getStartOfToday()
+      const { data, error: fetchErr } = await supabase
         .from('orders')
         .select(`
           id,
@@ -70,195 +107,370 @@ export default function OrdersPage() {
           total_amount,
           created_at,
           table_id,
-          tables (number),
+          tables (id, number),
           order_items (
             id,
             quantity,
             notes,
             price_at_order,
-            menu_items (name)
+            menu_items (name, printer_type)
+          ),
+          payments (
+            id,
+            amount,
+            method,
+            status
           )
         `)
         .eq('restaurant_id', restaurantId)
+        .neq('status', 'cancelled')
+        .gte('created_at', startOfToday)
         .order('created_at', { ascending: false })
 
       if (fetchErr) throw fetchErr
-      setOrders(data as unknown as Order[])
+      setBills(data as unknown as Order[])
       setError(null)
     } catch (err: any) {
-      console.error('Error fetching orders:', err)
-      setError(err.message || 'Failed to sync orders pipeline.')
+      console.error('Error fetching bills history:', err)
+      setError(err.message || 'Failed to sync billing logs.')
     } finally {
       setLoading(false)
       setSyncing(false)
     }
   }, [profile?.restaurant_id])
 
-  // 2. Realtime optimized subscription with automatic cleanup
+  // Real-time Supabase listeners
   useEffect(() => {
     const restaurantId = profile?.restaurant_id
     if (!restaurantId) return
 
-    fetchOrders()
+    fetchBillsHistory()
 
-    const supabaseClient = createClient()
-    // Setup real-time order channel
-    const channel = supabaseClient
-      .channel(`public:orders:${restaurantId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        async (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            // Fetch nested relationships for the single inserted/updated row
-            const { data: updatedOrder, error: singleFetchErr } = await supabaseClient
-              .from('orders')
-              .select(`
-                id,
-                status,
-                total_amount,
-                created_at,
-                table_id,
-                tables (number),
-                order_items (
-                  id,
-                  quantity,
-                  notes,
-                  price_at_order,
-                  menu_items (name)
-                )
-              `)
-              .eq('id', payload.new.id)
-              .single()
-
-            if (!singleFetchErr && updatedOrder) {
-              setOrders((prev) => {
-                const filtered = prev.filter((o) => o.id !== updatedOrder.id)
-                return [updatedOrder as unknown as Order, ...filtered].sort(
-                  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                )
-              })
-              
-              // Sync selected drawer order details in real-time
-              setSelectedOrder((prev) => 
-                prev && prev.id === updatedOrder.id ? (updatedOrder as unknown as Order) : prev
-              )
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setOrders((prev) => prev.filter((o) => o.id !== payload.old.id))
-            setSelectedOrder((prev) => prev && prev.id === payload.old.id ? null : prev)
-          }
-        }
-      )
+    const ordersChan = supabase
+      .channel(`grouped_bills_history_orders_${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` }, () => fetchBillsHistory())
       .subscribe()
 
-    // Cleanup subscription on unmount to avoid duplication/memory leak
-    return () => {
-      supabaseClient.removeChannel(channel)
-    }
-  }, [profile?.restaurant_id, fetchOrders])
+    const paymentsChan = supabase
+      .channel(`grouped_bills_history_payments_${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${restaurantId}` }, () => fetchBillsHistory())
+      .subscribe()
 
-  // 3. Mutate order status directly
-  const handleUpdateStatus = async (orderId: string, newStatus: 'preparing' | 'ready' | 'served' | 'cancelled') => {
-    setUpdatingOrderId(orderId)
-    
-    // Optimistic UI updates
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-    )
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus })
+    return () => {
+      supabase.removeChannel(ordersChan)
+      supabase.removeChannel(paymentsChan)
     }
+  }, [profile?.restaurant_id, fetchBillsHistory])
+
+  // Populate editor states on selection
+  useEffect(() => {
+    if (selectedBill) {
+      const pm = selectedBill.payments?.[0]
+      if (pm) {
+        setPaymentMethod(pm.method)
+      } else {
+        setPaymentMethod('upi')
+      }
+      setDiscountPercent(0)
+      setTaxPercent(5)
+      setServiceChargePercent(0)
+    }
+  }, [selectedBill])
+
+  // Aggregate items calculation
+  const getAggregatedItems = (order: Order | null) => {
+    if (!order) return []
+    const itemMap = new Map<string, { name: string; quantity: number; price: number }>()
+    order.order_items?.forEach((oi) => {
+      const name = oi.menu_items?.name || 'Unknown Item'
+      const price = oi.price_at_order || 0
+      const existing = itemMap.get(name)
+      if (existing) {
+        existing.quantity += oi.quantity
+      } else {
+        itemMap.set(name, { name, quantity: oi.quantity, price })
+      }
+    })
+    return Array.from(itemMap.values())
+  }
+
+  const aggregatedItems = getAggregatedItems(selectedBill)
+  const subtotal = aggregatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  
+  const discountAmount = subtotal * (discountPercent / 100)
+  const taxableAmount = Math.max(0, subtotal - discountAmount)
+  const taxAmount = taxableAmount * (taxPercent / 100)
+  const serviceChargeAmount = subtotal * (serviceChargePercent / 100)
+  const grandTotal = taxableAmount + taxAmount + serviceChargeAmount
+
+  // Update item quantity directly inside active orders from details pane
+  const handleUpdateItemQuantity = async (orderId: string, itemName: string, currentQty: number, change: number) => {
+    const newQty = currentQty + change
+    if (!selectedBill) return
+
+    const oi = selectedBill.order_items.find(o => o.menu_items?.name === itemName)
+    if (!oi) return
 
     try {
-      const { error: updateErr } = await supabase
+      if (newQty <= 0) {
+        const { error } = await supabase
+          .from('order_items')
+          .delete()
+          .eq('id', oi.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('order_items')
+          .update({ quantity: newQty })
+          .eq('id', oi.id)
+        if (error) throw error
+      }
+
+      // Re-calculate total order sum
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('quantity, price_at_order')
+        .eq('order_id', orderId)
+
+      const newSum = items?.reduce((sum, i) => sum + (i.price_at_order * i.quantity), 0) || 0
+
+      await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update({ total_amount: newSum })
         .eq('id', orderId)
 
-      if (updateErr) throw updateErr
-      
-      // Real-time table release logic (If order is cancelled, set table status available if no other orders)
-      if (newStatus === 'cancelled' && selectedOrder) {
-        // Query if any other preparing/ready orders exist on this table
-        const { count } = await supabase
-          .from('orders')
-          .select('id', { count: 'exact', head: true })
-          .eq('table_id', selectedOrder.table_id)
-          .in('status', ['preparing', 'ready'])
-          
-        if (!count || count === 0) {
-          await supabase
-            .from('tables')
-            .update({ status: 'available' })
-            .eq('id', selectedOrder.table_id)
-        }
+      // Refresh drawer
+      const { data: updatedBill } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          status,
+          total_amount,
+          created_at,
+          table_id,
+          tables (id, number),
+          order_items (
+            id,
+            quantity,
+            notes,
+            price_at_order,
+            menu_items (name, printer_type)
+          ),
+          payments (
+            id,
+            amount,
+            method,
+            status
+          )
+        `)
+        .eq('id', orderId)
+        .single()
+
+      if (updatedBill) {
+        setSelectedBill(updatedBill as unknown as Order)
       }
+      
+      fetchBillsHistory()
     } catch (err: any) {
-      console.error('Error changing order status:', err)
-      fetchOrders() // Rollback state
-      setError(`Failed to transition order status: ${err.message}`)
-    } finally {
-      setUpdatingOrderId(null)
+      console.error('Failed to update quantity:', err)
+      alert(`Could not update quantity: ${err.message}`)
     }
   }
 
-  // 4. Utility helpers
-  const formatTimeElapsed = (dateString: string) => {
-    const diffMs = new Date().getTime() - new Date(dateString).getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    const diffHours = Math.floor(diffMins / 60)
-    return `${diffHours}h ago`
+  // Save changes & print
+  const handleSaveAndPrintBill = async () => {
+    if (!profile?.restaurant_id || !selectedBill) return
+    setSavingBill(true)
+
+    try {
+      // 1. Update order total
+      const { error: orderErr } = await supabase
+        .from('orders')
+        .update({ total_amount: grandTotal })
+        .eq('id', selectedBill.id)
+
+      if (orderErr) throw orderErr
+
+      // 2. Update payment if settled
+      const payment = selectedBill.payments?.[0]
+      if (payment) {
+        const { error: payErr } = await supabase
+          .from('payments')
+          .update({ amount: grandTotal, method: paymentMethod })
+          .eq('id', payment.id)
+
+        if (payErr) throw payErr
+      }
+
+      // 3. Print
+      const { data: printers } = await supabase
+        .from('printers')
+        .select('id, name, type')
+        .eq('restaurant_id', profile.restaurant_id)
+        .eq('type', 'billing')
+        .eq('is_active', true)
+
+      let targetPrinters = printers || []
+      if (targetPrinters.length === 0) {
+        const { data: fallbacks } = await supabase
+          .from('printers')
+          .select('id, name, type')
+          .eq('restaurant_id', profile.restaurant_id)
+          .eq('is_active', true)
+        if (fallbacks && fallbacks.length > 0) targetPrinters = [fallbacks[0]]
+      }
+
+      if (targetPrinters.length > 0) {
+        let restaurantName = 'Tipsy POS'
+        let address = ''
+        let phone = ''
+        const { data: rest } = await supabase
+          .from('restaurants')
+          .select('name, address, phone')
+          .eq('id', profile.restaurant_id)
+          .single()
+        
+        if (rest) {
+          restaurantName = rest.name || restaurantName
+          address = rest.address || ''
+          phone = rest.phone || ''
+        }
+
+        const billPayload = {
+          type: 'BILL',
+          isReprint: true,
+          restaurantName,
+          restaurantAddress: address,
+          restaurantPhone: phone,
+          tableName: 'Table',
+          tableNumber: String(selectedBill.tables?.number || '?'),
+          captainName: profile.name || 'Captain',
+          invoiceNumber: `INV-${selectedBill.id.substring(0, 5).toUpperCase()}`,
+          timestamp: new Date().toISOString(),
+          items: aggregatedItems,
+          subtotal,
+          taxPercent,
+          taxAmount,
+          discountPercent,
+          discountAmount,
+          serviceChargePercent,
+          serviceChargeAmount,
+          grandTotal,
+          paymentMethod: payment ? paymentMethod : 'Pending',
+          isPaid: !!payment
+        }
+
+        const jobs = targetPrinters.map(p => ({
+          restaurant_id: profile.restaurant_id,
+          printer_id: p.id,
+          payload: billPayload,
+          status: 'pending',
+          attempts: 0
+        }))
+
+        await supabase.from('print_jobs').insert(jobs)
+        alert('Updated bill print scheduled successfully!')
+      } else {
+        alert('Bill saved, but no billing printers were found to dispatch the print job.')
+      }
+
+      setSelectedBill(null)
+      fetchBillsHistory()
+    } catch (e: any) {
+      console.error('Failed saving bill:', e)
+      alert(`Save error: ${e.message}`)
+    } finally {
+      setSavingBill(false)
+    }
   }
 
-  const getFilteredOrders = () => {
-    if (statusFilter === 'all') return orders
-    return orders.filter(o => o.status === statusFilter)
-  }
+  // Filter bills list for output
+  const filteredBills = useMemo(() => {
+    let list = bills
 
-  const getStatusColor = (status: 'preparing' | 'ready' | 'served' | 'cancelled') => {
-    return {
-      preparing: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-      ready: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 animate-pulse',
-      served: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 border-transparent',
-      cancelled: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
-    }[status]
+    // Status filter
+    if (statusFilter === 'active') {
+      list = list.filter(b => !b.payments || b.payments.length === 0)
+    } else if (statusFilter === 'settled') {
+      list = list.filter(b => b.payments && b.payments.length > 0)
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      list = list.filter(b => {
+        const matchesTable = b.tables?.number?.toString().includes(q) || `t${b.tables?.number}`.includes(q)
+        const matchesId = b.id.toLowerCase().includes(q)
+        const matchesItems = b.order_items.some(item => 
+          item.menu_items?.name?.toLowerCase().includes(q)
+        )
+        return matchesTable || matchesId || matchesItems
+      })
+    }
+
+    return list
+  }, [bills, statusFilter, searchQuery])
+
+  // Group bills by table number
+  const groupedBillsByTable = useMemo(() => {
+    const map = new Map<number, { tableId: string; tableNumber: number; orderTimeline: Order[] }>()
+    
+    filteredBills.forEach((bill) => {
+      const tNum = bill.tables?.number
+      const tId = bill.tables?.id
+      if (tNum !== undefined && tId !== undefined) {
+        const existing = map.get(tNum)
+        if (existing) {
+          existing.orderTimeline.push(bill)
+        } else {
+          map.set(tNum, { tableId: tId, tableNumber: tNum, orderTimeline: [bill] })
+        }
+      }
+    })
+
+    // Sort by Table Number ascending
+    const sortedGroups = Array.from(map.values()).sort((a, b) => a.tableNumber - b.tableNumber)
+    
+    // Sort each table's timeline by time descending (newest first)
+    sortedGroups.forEach(g => {
+      g.orderTimeline.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    })
+
+    return sortedGroups
+  }, [filteredBills])
+
+  const formatTimeStr = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   if (loading) {
     return (
-      <div className="flex h-[50vh] w-full items-center justify-center">
+      <div className="flex h-[50vh] w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto" />
-          <p className="text-muted-foreground text-xs font-semibold animate-pulse">Syncing Active Kitchen Pipelines...</p>
+          <p className="text-muted-foreground text-xs font-semibold animate-pulse">Loading billing logs timeline...</p>
         </div>
       </div>
     )
   }
 
-  const activeOrdersCount = orders.filter(o => o.status === 'preparing' || o.status === 'ready').length
+  const totalSettledToday = bills.reduce((sum, b) => sum + (b.payments?.[0]?.amount || 0), 0)
+  const totalUnpaidToday = bills.reduce((sum, b) => sum + (!b.payments || b.payments.length === 0 ? b.total_amount : 0), 0)
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 relative pb-10">
       
-      {/* Header and Live Status Actions */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Orders Board</h2>
-          <p className="text-[10px] text-muted-foreground">Monitor running orders and preparation statuses</p>
+          <h2 className="text-lg font-black tracking-tight text-foreground">Billing History Logs</h2>
+          <p className="text-[10px] text-muted-foreground">Detailed logs of cleared and active orders grouped by tables</p>
         </div>
         
         <button
-          onClick={() => fetchOrders(true)}
+          onClick={() => fetchBillsHistory(true)}
           disabled={syncing}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-background text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 active:scale-95 transition-all disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-background text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 active:scale-95 transition-all disabled:opacity-50"
           title="Force Sync Cache"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
@@ -275,240 +487,398 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* KPI Overview and Horizontal Status Filters */}
-      <div className="flex items-center gap-3 p-3 bg-zinc-150/40 dark:bg-zinc-900/30 border border-zinc-200/30 dark:border-zinc-850/40 rounded-2xl">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white font-extrabold shadow-sm">
-          <TrendingUp className="w-5 h-5 text-white" />
+      {/* Summary Stats Card */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 bg-emerald-500/[0.03] border border-emerald-500/15 rounded-2xl">
+          <h4 className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider">Today's Revenue</h4>
+          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">₹{totalSettledToday.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
-        <div>
-          <h3 className="text-xs font-bold text-foreground">Running Kitchen Orders</h3>
-          <p className="text-[9.5px] text-muted-foreground font-semibold mt-0.5">
-            {activeOrdersCount} KOT orders currently preparing or ready for dispatch
-          </p>
+        <div className="p-3 bg-amber-500/[0.03] border border-amber-500/15 rounded-2xl">
+          <h4 className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider">Unpaid Amount</h4>
+          <p className="text-sm font-black text-amber-600 dark:text-amber-400 mt-1">₹{totalUnpaidToday.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
       </div>
 
-      {/* Category Pills Filters */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none select-none">
-        {(['all', 'preparing', 'ready', 'served'] as const).map((tab) => {
-          const count = tab === 'all' 
-            ? orders.length 
-            : orders.filter(o => o.status === tab).length
-            
-          const activeStyles = statusFilter === tab
-            ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-950 font-black shadow-sm'
-            : 'border border-zinc-200/50 dark:border-zinc-800 bg-background text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+      {/* Search Input */}
+      <div className="relative shrink-0">
+        <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400" />
+        <input
+          type="text"
+          placeholder="Search table, invoice ID or dish..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-zinc-100/60 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 rounded-2xl py-2.5 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3.5 top-3 text-zinc-400 hover:text-foreground active:scale-90 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
+      {/* Status Segment Control */}
+      <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/60 dark:bg-zinc-900/50 border border-zinc-200/40 dark:border-zinc-800/40 rounded-2xl shrink-0">
+        {[
+          { id: 'all', label: 'All Invoices' },
+          { id: 'active', label: 'Active ⏳' },
+          { id: 'settled', label: 'Settled 💵' }
+        ].map((tab) => {
+          const isActive = statusFilter === tab.id
           return (
             <button
-              key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={`px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap active:scale-95 transition-all ${activeStyles}`}
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id as any)}
+              className={`py-1.5 text-[10px] font-extrabold rounded-xl uppercase tracking-wider transition-all active:scale-95 ${
+                isActive 
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black shadow-sm'
+                  : 'text-zinc-500 hover:text-foreground'
+              }`}
             >
-              {tab} ({count})
+              {tab.label}
             </button>
           )
         })}
       </div>
 
-      {/* Vertical Orders Feed */}
-      <div className="space-y-3">
-        {getFilteredOrders().length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border border-dashed border-zinc-200 dark:border-zinc-900 rounded-3xl space-y-2 mt-2">
-            <ClipboardList className="w-8 h-8 opacity-45" />
-            <p className="text-xs font-semibold">No active orders in this pipeline</p>
+      {/* Grouped Table List */}
+      <div className="space-y-4 pt-2">
+        {groupedBillsByTable.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border border-dashed border-zinc-200 dark:border-zinc-900 rounded-3xl space-y-2">
+            <FileText className="w-8 h-8 opacity-45 animate-pulse" />
+            <p className="text-xs font-semibold">No bills logs found matching filters</p>
           </div>
         ) : (
-          getFilteredOrders().map((order) => {
-            const itemCount = order.order_items.reduce((sum, item) => sum + item.quantity, 0)
-            const isUpdating = updatingOrderId === order.id
+          groupedBillsByTable.map((group) => {
+            const runningCount = group.orderTimeline.filter(o => !o.payments || o.payments.length === 0).length
+            const clearedCount = group.orderTimeline.length - runningCount
 
             return (
-              <button
-                key={order.id}
-                onClick={() => setSelectedOrder(order)}
-                disabled={isUpdating}
-                className="flex w-full items-center justify-between p-4 rounded-2xl border border-zinc-200/60 dark:border-zinc-900/60 bg-background/50 hover:bg-zinc-50 dark:hover:bg-zinc-900/10 active:scale-[0.98] transition-all text-left cursor-pointer relative overflow-hidden"
+              <div 
+                key={group.tableId} 
+                onClick={() => setSelectedBill(group.orderTimeline[0])}
+                className="w-full text-left p-4 rounded-3xl border border-zinc-150 dark:border-zinc-900/60 bg-zinc-50/15 dark:bg-zinc-950/10 space-y-3 cursor-pointer transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-950/30 active:scale-[0.99] block"
               >
-                {isUpdating && (
-                  <div className="absolute inset-0 bg-background/60 dark:bg-background/40 flex items-center justify-center z-10">
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                {/* Table Title Section */}
+                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/40 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black text-xs">
+                      T{group.tableNumber}
+                    </span>
+                    <h3 className="text-xs font-black text-foreground">Table T{group.tableNumber} Logs</h3>
                   </div>
-                )}
-
-                <div className="flex items-center gap-3.5">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-900 font-extrabold text-lg text-foreground">
-                    T{order.tables?.number || '?'}
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-black text-foreground">Order #{order.id.slice(0, 5).toUpperCase()}</h3>
-                    <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                      <Users className="w-3 h-3" /> {itemCount} Items
-                      <span>•</span>
-                      <Clock className="w-3 h-3" /> {formatTimeElapsed(order.created_at)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right flex flex-col items-end gap-1">
-                  <span className="text-xs font-black tracking-tight">₹{order.total_amount.toFixed(2)}</span>
-                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${getStatusColor(order.status)}`}>
-                    {order.status}
+                  <span className="text-[8.5px] font-black uppercase text-zinc-400 tracking-wider">
+                    {clearedCount > 0 && `${clearedCount} Cleared`}
+                    {clearedCount > 0 && runningCount > 0 && ' • '}
+                    {runningCount > 0 && `${runningCount} Active`}
                   </span>
                 </div>
-              </button>
+
+                {/* List of orders/sessions under this table */}
+                <div className="space-y-2.5">
+                  {group.orderTimeline.map((bill, index) => {
+                    const hasPayment = bill.payments && bill.payments.length > 0
+                    const payment = bill.payments?.[0]
+                    
+                    // Simple description of ordered items
+                    const itemsDesc = bill.order_items
+                      .map(oi => `${oi.quantity}x ${oi.menu_items?.name || 'Unknown'}`)
+                      .join(', ')
+
+                    return (
+                      <div
+                        key={bill.id}
+                        className="flex items-start justify-between py-2 border-b border-zinc-100/40 dark:border-zinc-900/20 last:border-0"
+                      >
+                        <div className="flex-1 min-w-0 pr-3.5 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-black text-foreground">
+                              Order #{group.orderTimeline.length - index} (Inv #{bill.id.slice(0, 5).toUpperCase()})
+                            </span>
+                            {payment && (
+                              <span className="text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600">
+                                {payment.method}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Dish details list */}
+                          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
+                            {itemsDesc || 'No items selected'}
+                          </p>
+
+                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-bold">
+                            <Clock className="w-2.5 h-2.5" />
+                            <span>{formatTimeStr(bill.created_at)}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex flex-col items-end gap-1.5 shrink-0 self-center">
+                          <span className="text-xs font-black text-foreground">₹{bill.total_amount.toFixed(2)}</span>
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${
+                            hasPayment 
+                              ? 'bg-emerald-500/5 text-emerald-600 border-emerald-500/20' 
+                              : 'bg-amber-500/5 text-amber-600 border-amber-500/20'
+                          }`}>
+                            {hasPayment ? 'Cleared' : 'Unpaid'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )
           })
         )}
       </div>
 
-      {/* Touch Drawer sheet for detailed order review & state controls */}
-      {selectedOrder && (
+      {/* Bill Editor / Invoice Detail Screen Drawer */}
+      {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-          {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm transition-opacity"
-            onClick={() => setSelectedOrder(null)}
+            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-sm transition-opacity"
+            onClick={() => setSelectedBill(null)}
           />
 
-          {/* Sheet Body */}
-          <div className="relative z-10 w-full max-w-md bg-background border border-zinc-200 dark:border-zinc-900 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-250 flex flex-col max-h-[80vh]">
-            
-            {/* Grab handle for touch feel */}
+          <div className="relative z-10 w-full max-w-md bg-background border border-zinc-200 dark:border-zinc-900 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-250 flex flex-col max-h-[90vh]">
             <div className="h-1.5 w-12 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-4 sm:hidden shrink-0" />
 
-            {/* Title / Details Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-zinc-150 dark:border-zinc-900 shrink-0">
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-900 font-extrabold text-lg">
-                  T{selectedOrder.tables?.number || '?'}
+            {/* Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white font-black text-base shadow-sm">
+                  T{selectedBill.tables?.number || '?'}
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-foreground">Order Details</h3>
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                    Order #{selectedOrder.id.slice(0, 8).toUpperCase()} 
-                    <span>•</span>
-                    {formatTimeElapsed(selectedOrder.created_at)}
+                  <h3 className="text-sm font-black text-foreground">Adjust Bill Invoice</h3>
+                  <p className="text-[10px] text-muted-foreground font-bold">
+                    Inv: #{selectedBill.id.slice(0, 8).toUpperCase()} • {selectedBill.payments && selectedBill.payments.length > 0 ? 'Settled' : 'Active'}
                   </p>
                 </div>
               </div>
               <button 
-                onClick={() => setSelectedOrder(null)}
+                onClick={() => setSelectedBill(null)}
                 className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-foreground cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Scrollable list of dishes in KOT */}
-            <div className="flex-1 overflow-y-auto py-4 space-y-3.5 pr-1">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Items Ordered</span>
+            {/* Scrollable pane */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-0.5">
               
-              {selectedOrder.order_items.map((item) => (
-                <div 
-                  key={item.id}
-                  className="flex flex-col p-3 rounded-xl border border-zinc-150 dark:border-zinc-900 bg-zinc-50/20 dark:bg-zinc-950/20"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-black text-foreground">{item.menu_items?.name || 'Deleted Dish'}</h4>
-                      <p className="text-[9.5px] font-bold text-muted-foreground mt-0.5">
-                        Qty: {item.quantity} × ₹{item.price_at_order.toFixed(2)}
-                      </p>
-                    </div>
-                    <span className="text-xs font-black text-foreground">
-                      ₹{(item.price_at_order * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
+              {/* Ordered items listing */}
+              <div>
+                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mb-2 px-1">Aggregated Dishes</span>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {aggregatedItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-zinc-150 dark:border-zinc-900 bg-zinc-50/20 dark:bg-zinc-950/20 text-xs">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span className="text-foreground">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {/* Qty Adjusters (Only editable if active/unpaid) */}
+                        {(!selectedBill.payments || selectedBill.payments.length === 0) ? (
+                          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 text-foreground font-black text-[11px] h-6">
+                            <button
+                              onClick={() => handleUpdateItemQuantity(selectedBill.id, item.name, item.quantity, -1)}
+                              className="flex items-center justify-center w-5 h-5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
+                            >
+                              <Minus className="w-2.5 h-2.5 text-muted-foreground" />
+                            </button>
+                            
+                            <span className="w-5 text-center text-[10px] font-bold tabular-nums">
+                              {item.quantity}
+                            </span>
 
-                  {item.notes && (
-                    <div className="mt-2.5 px-2.5 py-1.5 rounded-lg bg-background text-[10px] font-semibold text-amber-500 border border-amber-500/10 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span>Note: "{item.notes}"</span>
+                            <button
+                              onClick={() => handleUpdateItemQuantity(selectedBill.id, item.name, item.quantity, 1)}
+                              className="flex items-center justify-center w-5 h-5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5 text-muted-foreground" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-bold text-muted-foreground bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded">
+                            {item.quantity}x
+                          </span>
+                        )}
+
+                        <div className="font-black text-foreground w-16 text-right">
+                          ₹{(item.price * item.quantity).toFixed(2)}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {/* Pricing Summary */}
-            <div className="border-t border-zinc-150 dark:border-zinc-900 pt-3 pb-4 shrink-0 flex justify-between items-center px-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total KOT Bill</span>
-              <span className="text-base font-black text-amber-500">₹{selectedOrder.total_amount.toFixed(2)}</span>
-            </div>
-
-            {/* Quick Status State Transitions actions */}
-            <div className="pt-4 border-t border-zinc-150 dark:border-zinc-900 space-y-3 shrink-0">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block px-1">Transition Pipeline Status</span>
-              
-              <div className="grid grid-cols-2 gap-2">
-                
-                {/* 1. Mark Preparing / Cook */}
-                <button
-                  onClick={() => handleUpdateStatus(selectedOrder.id, 'preparing')}
-                  disabled={selectedOrder.status === 'preparing'}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-black transition-all cursor-pointer ${
-                    selectedOrder.status === 'preparing'
-                      ? 'border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400 font-extrabold opacity-70'
-                      : 'border-zinc-200/60 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  Preparing
-                </button>
-
-                {/* 2. Mark Ready (alert captain KOT is ready) */}
-                <button
-                  onClick={() => handleUpdateStatus(selectedOrder.id, 'ready')}
-                  disabled={selectedOrder.status === 'ready'}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-black transition-all cursor-pointer ${
-                    selectedOrder.status === 'ready'
-                      ? 'border-emerald-500/40 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 font-extrabold opacity-70'
-                      : 'border-zinc-200/60 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <Coffee className="w-3.5 h-3.5" />
-                  Ready
-                </button>
-
-                {/* 3. Mark Served */}
-                <button
-                  onClick={() => handleUpdateStatus(selectedOrder.id, 'served')}
-                  disabled={selectedOrder.status === 'served'}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-black transition-all cursor-pointer ${
-                    selectedOrder.status === 'served'
-                      ? 'border-zinc-200 dark:border-zinc-800 bg-zinc-100 text-zinc-400 font-extrabold opacity-70'
-                      : 'border-zinc-200/60 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Served
-                </button>
-
-                {/* 4. Cancel KOT */}
-                <button
-                  onClick={() => handleUpdateStatus(selectedOrder.id, 'cancelled')}
-                  disabled={selectedOrder.status === 'cancelled'}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-black transition-all cursor-pointer ${
-                    selectedOrder.status === 'cancelled'
-                      ? 'border-red-500/40 bg-red-500/5 text-red-600 dark:text-red-400 font-extrabold opacity-70'
-                      : 'border-zinc-200/60 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-red-500 hover:text-red-600'
-                  }`}
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  Cancel Order
-                </button>
-
               </div>
+
+              {/* Adjustments Editor */}
+              <div className="p-3.5 rounded-2xl bg-zinc-100/50 dark:bg-zinc-900/40 border border-zinc-200/50 dark:border-zinc-850/50 space-y-3">
+                <div className="flex items-center gap-1.5 text-[9.5px] font-black text-foreground uppercase tracking-wider">
+                  <Percent className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Adjust Taxes & Discounts</span>
+                </div>
+
+                {/* Discount Select */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>Discount %</span>
+                    <span className="text-foreground font-black text-xs">{discountPercent}% (₹{discountAmount.toFixed(1)})</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 5, 10, 15, 20].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setDiscountPercent(val)}
+                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
+                          discountPercent === val 
+                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
+                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
+                        }`}
+                      >
+                        {val}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* GST Tax Select */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>GST Tax %</span>
+                    <span className="text-foreground font-black text-xs">{taxPercent}% (₹{taxAmount.toFixed(1)})</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 5, 12, 18, 28].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setTaxPercent(val)}
+                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
+                          taxPercent === val 
+                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
+                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
+                        }`}
+                      >
+                        {val}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Service Charge Select */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>Service Charge %</span>
+                    <span className="text-foreground font-black text-xs">{serviceChargePercent}% (₹{serviceChargeAmount.toFixed(1)})</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 5, 10].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setServiceChargePercent(val)}
+                        className={`px-4.5 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
+                          serviceChargePercent === val 
+                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
+                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
+                        }`}
+                      >
+                        {val}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Calculations Summary */}
+              <div className="border-t border-zinc-150 dark:border-zinc-900 pt-3 space-y-2">
+                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                  <span>Subtotal</span>
+                  <span className="font-bold text-foreground">₹{subtotal.toFixed(2)}</span>
+                </div>
+                {discountPercent > 0 && (
+                  <div className="flex justify-between text-[11px] font-semibold text-rose-500 px-1">
+                    <span>Discount ({discountPercent}%)</span>
+                    <span className="font-bold">-₹{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                  <span>GST Tax ({taxPercent}%)</span>
+                  <span className="font-bold text-foreground">₹{taxAmount.toFixed(2)}</span>
+                </div>
+                {serviceChargePercent > 0 && (
+                  <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                    <span>Service Charge ({serviceChargePercent}%)</span>
+                    <span className="font-bold text-foreground">₹{serviceChargeAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-black text-foreground pt-1.5 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
+                  <span className="uppercase tracking-wider">Adjusted Grand Total</span>
+                  <span className="text-sm font-black text-amber-500">₹{grandTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Payment Method adjustment if already paid */}
+              {selectedBill.payments && selectedBill.payments.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block px-1">Payment Method Used</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['upi', 'cash', 'card'] as const).map((method) => {
+                      const labels = { upi: '📱 UPI', cash: '💵 Cash', card: '💳 Card' }
+                      const isSelected = paymentMethod === method
+                      return (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          className={`py-2 px-1 rounded-xl text-[10px] font-extrabold active:scale-95 transition-all text-center border cursor-pointer ${
+                            isSelected 
+                              ? 'bg-zinc-900 text-zinc-50 border-zinc-950 dark:bg-zinc-50 dark:text-zinc-950 dark:border-white shadow-sm'
+                              : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                          }`}
+                        >
+                          {labels[method]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
 
-            {/* Bottom Actions */}
-            <div className="pt-4 mt-1.5 flex justify-end shrink-0">
+            {/* Bottom Actions Row */}
+            <div className="pt-4 border-t border-zinc-150 dark:border-zinc-900 shrink-0 flex gap-2.5">
               <button
-                onClick={() => setSelectedOrder(null)}
-                className="px-5 py-2.5 rounded-xl border border-zinc-250 bg-background text-foreground hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-xs font-bold cursor-pointer"
+                onClick={() => setSelectedBill(null)}
+                disabled={savingBill}
+                className="flex-1 py-3.5 rounded-xl border border-zinc-250 bg-background text-foreground hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-xs font-bold cursor-pointer select-none active:scale-[0.98] transition-all"
               >
-                Close Details
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSaveAndPrintBill}
+                disabled={savingBill}
+                className="flex-[2] py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50"
+              >
+                {savingBill ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4 text-white" />
+                    Save & Reprint Bill
+                  </>
+                )}
               </button>
             </div>
 
