@@ -224,7 +224,7 @@ export default function TablesPage() {
 
       if (itemsErr) throw itemsErr
 
-      const newTotal = updatedItems?.reduce((sum, item) => sum + (item.price_at_order * item.quantity), 0) || 0
+      const newTotal = updatedItems?.reduce((sum: number, item: any) => sum + (item.price_at_order * item.quantity), 0) || 0
 
       // Update orders table
       const { error: orderUpdateErr } = await supabase
@@ -385,7 +385,7 @@ export default function TablesPage() {
         isPaid
       }
 
-      const printJobs = targetPrinters.map(printer => ({
+      const printJobs = targetPrinters.map((printer: any) => ({
         restaurant_id: profile.restaurant_id,
         printer_id: printer.id,
         payload: billPayload,

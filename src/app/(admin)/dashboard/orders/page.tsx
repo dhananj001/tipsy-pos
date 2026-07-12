@@ -112,7 +112,7 @@ export default function AdminOrdersPage() {
           table: 'orders',
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        async (payload) => {
+        async (payload: any) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const { data: updatedOrder, error: singleFetchErr } = await supabaseClient
               .from('orders')

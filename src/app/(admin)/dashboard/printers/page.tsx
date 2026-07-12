@@ -142,7 +142,7 @@ export default function PrintersManagementPage() {
           table: 'printers',
           filter: `restaurant_id=eq.${profile.restaurant_id}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             setPrinters((prev) => {
               if (prev.some((p) => p.id === payload.new.id)) return prev
@@ -170,7 +170,7 @@ export default function PrintersManagementPage() {
           table: 'print_jobs',
           filter: `restaurant_id=eq.${profile.restaurant_id}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             setPrintJobs((prev) => {
               if (prev.some((j) => j.id === payload.new.id)) return prev

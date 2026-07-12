@@ -186,12 +186,12 @@ export default function AdminDashboardPage() {
 
       // calculations
       let salesTotal = 0
-      payments?.forEach(p => {
+      payments?.forEach((p: any) => {
         salesTotal += parseFloat(p.amount)
       })
 
       const latestPayments = (payments || []).slice(0, 4)
-      const orderIds = latestPayments.map(p => p.order_id).filter(Boolean)
+      const orderIds = latestPayments.map((p: any) => p.order_id).filter(Boolean)
       const orderTableMap: Record<string, string> = {}
       const orderItemsMap: Record<string, Array<{ name: string; quantity: number; price: number }>> = {}
 
@@ -246,7 +246,7 @@ export default function AdminDashboardPage() {
       })
 
       // Aggregate recent closed transactions
-      const recentTx = latestPayments.map(p => {
+      const recentTx = latestPayments.map((p: any) => {
         const tableNumber = orderTableMap[p.order_id] || 'Counter'
         const timeDiff = new Date().getTime() - new Date(p.created_at).getTime()
         const mins = Math.max(1, Math.round(timeDiff / (1000 * 60)))
@@ -267,7 +267,7 @@ export default function AdminDashboardPage() {
       const hourlySales = Array(6).fill(0)
       const hoursLabels = ['12:00', '14:00', '16:00', '18:00', '20:00', '22:00']
       
-      payments?.forEach(p => {
+      payments?.forEach((p: any) => {
         const date = new Date(p.created_at)
         const hour = date.getHours()
         let binIndex = 0

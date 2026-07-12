@@ -232,7 +232,7 @@ export default function GroupedBillsHistoryPage() {
         .select('quantity, price_at_order')
         .eq('order_id', orderId)
 
-      const newSum = items?.reduce((sum, i) => sum + (i.price_at_order * i.quantity), 0) || 0
+      const newSum = items?.reduce((sum: number, i: any) => sum + (i.price_at_order * i.quantity), 0) || 0
 
       await supabase
         .from('orders')
@@ -360,7 +360,7 @@ export default function GroupedBillsHistoryPage() {
           isPaid: !!payment
         }
 
-        const jobs = targetPrinters.map(p => ({
+        const jobs = targetPrinters.map((p: any) => ({
           restaurant_id: profile.restaurant_id,
           printer_id: p.id,
           payload: billPayload,

@@ -114,7 +114,7 @@ export default function MenuManagementPage() {
 
         if (seedCatError || !newCats) throw seedCatError || new Error('Seeding categories returned empty response')
 
-        const catMap = new Map(newCats.map(c => [c.name, c.id]))
+        const catMap = new Map(newCats.map((c: any) => [c.name, c.id]))
 
         const itemsToInsert = MENU_ITEMS.map(item => {
           const cat = MENU_CATEGORIES.find(c => c.name === item.categoryName)

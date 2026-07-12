@@ -225,7 +225,7 @@ function OrderPageContent() {
         .select()
 
       if (catError || !insertedCats) throw catError || new Error('Seeding categories returned empty response')
-      const catMap = new Map(insertedCats.map(c => [c.name, c.id]))
+      const catMap = new Map(insertedCats.map((c: any) => [c.name, c.id]))
 
       const itemsToInsert = MENU_ITEMS.map(item => {
         const cat = MENU_CATEGORIES.find(c => c.name === item.categoryName)
@@ -489,11 +489,11 @@ function OrderPageContent() {
       for (const [printerType, groupedItems] of Object.entries(itemsByPrinterType)) {
         if (groupedItems.length === 0) continue
 
-        let matchedPrinters = printers?.filter(p => p.type === printerType) || []
+        let matchedPrinters = printers?.filter((p: any) => p.type === printerType) || []
 
         if (matchedPrinters.length === 0 && printers && printers.length > 0) {
           console.warn(`No active printers found for type [${printerType}]. Attempting fallback...`)
-          const kitchenPrinter = printers.find(p => p.type === 'kitchen')
+          const kitchenPrinter = printers.find((p: any) => p.type === 'kitchen')
           matchedPrinters = kitchenPrinter ? [kitchenPrinter] : [printers[0]]
         }
 
@@ -518,7 +518,7 @@ function OrderPageContent() {
           }))
         }
 
-        matchedPrinters.forEach(printer => {
+        matchedPrinters.forEach((printer: any) => {
           printJobsToInsert.push({
             restaurant_id: profile.restaurant_id,
             printer_id: printer.id,

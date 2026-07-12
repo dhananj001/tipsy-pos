@@ -231,7 +231,7 @@ export default function AdminTablesPage() {
         isPaid
       }
 
-      const printJobs = targetPrinters.map(printer => ({
+      const printJobs = targetPrinters.map((printer: any) => ({
         restaurant_id: profile.restaurant_id,
         printer_id: printer.id,
         payload: billPayload,
@@ -306,7 +306,7 @@ export default function AdminTablesPage() {
           table: 'tables',
           filter: `restaurant_id=eq.${profile.restaurant_id}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             setTables((prev) => {
               if (prev.some((t) => t.id === payload.new.id)) return prev

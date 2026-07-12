@@ -113,7 +113,7 @@ export default function StaffManagementPage() {
           table: 'users',
           filter: `restaurant_id=eq.${profile.restaurant_id}`
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             setStaff((prev) => {
               if (prev.some((s) => s.id === payload.new.id)) return prev

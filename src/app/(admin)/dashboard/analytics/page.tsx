@@ -97,7 +97,7 @@ export default function AnalyticsDashboard() {
       const methods = { upi: 0, cash: 0, card: 0 }
       const dailyMap: Record<string, { amount: number; count: number }> = {}
 
-      payments?.forEach(p => {
+      payments?.forEach((p: any) => {
         const amt = parseFloat(p.amount)
         salesTotal += amt
         
