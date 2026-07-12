@@ -413,7 +413,7 @@ export default function AdminDashboardPage() {
       setStats({
         totalSales: salesTotal,
         totalTablesCount: tables?.length || 12,
-        activeTablesCount: tables?.filter(t => t.status === 'occupied' || t.status === 'billing').length || 0,
+        activeTablesCount: tables?.filter((t: any) => t.status === 'occupied' || t.status === 'billing').length || 0,
         runningOrdersCount: orders?.length || 0,
         staffCount: profiles?.length || 3,
         recentActivities: recentTx,

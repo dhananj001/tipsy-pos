@@ -66,7 +66,7 @@ export default function AnalyticsDashboard() {
         .eq('restaurant_id', restaurantId)
 
       if (tableErr) throw tableErr
-      const activeTablesCount = tables?.filter(t => t.status === 'occupied' || t.status === 'billing').length || 0
+      const activeTablesCount = tables?.filter((t: any) => t.status === 'occupied' || t.status === 'billing').length || 0
 
       // Query C: Total orders counts
       const { count: orderCount, error: orderErr } = await supabaseClient
