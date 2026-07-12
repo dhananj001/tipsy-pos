@@ -3,6 +3,32 @@ import { logger } from "../utils/logger.js";
 import { CONFIG } from "../config/supabase.js";
 
 /**
+ * Recursively sanitizes strings in the payload object to prevent printing gibberish.
+ * Replaces Indian Rupee symbol (₹) with 'Rs.' and strips all non-ASCII characters.
+ */
+function sanitizePayload(obj) {
+  if (typeof obj === "string") {
+    return obj
+      .replace(/₹/g, "Rs.")
+      .replace(/[^\x00-\x7F]/g, "")
+      .trim();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePayload);
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const newObj = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        newObj[key] = sanitizePayload(obj[key]);
+      }
+    }
+    return newObj;
+  }
+  return obj;
+}
+
+/**
  * Core Printer Service
  * Connects to ESC/POS LAN printers and renders styled receipts/KOTs.
  */
@@ -15,12 +41,14 @@ export const printerService = {
    */
   print: async (job, printerInfo) => {
     const { ip_address, port, name: printerName } = printerInfo;
-    const { payload } = job;
     const printerIp = ip_address.trim();
     const printerPort = port || 9100;
     const connectionUri = `tcp://${printerIp}:${printerPort}`;
 
     logger.info(`Attempting print job [${job.id}] on printer: ${printerName} (${connectionUri})`);
+
+    // Sanitize the print payload to prevent printer configuration and character set issues
+    const payload = sanitizePayload(job.payload || {});
 
     // Initialize the thermal printer
     const printer = new ThermalPrinter({
@@ -32,16 +60,10 @@ export const printerService = {
     });
 
     try {
-      // 1. Check printer connectivity
-      const isConnected = await printer.isPrinterConnected();
-      if (!isConnected) {
-        throw new Error(`Cannot connect to printer at ${connectionUri}. Network timeout or printer offline.`);
-      }
-
-      // 2. Clear printer buffer
+      // 1. Clear printer buffer
       printer.clear();
 
-      // 3. Format print document based on job type
+      // 2. Format print document based on job type
       const jobType = (payload.type || "KOT").toUpperCase();
       if (jobType === "KOT") {
         renderKOT(printer, payload);
@@ -51,10 +73,10 @@ export const printerService = {
         renderGeneric(printer, payload);
       }
 
-      // 4. Cut Paper
+      // 3. Cut Paper
       printer.cut();
 
-      // 5. Execute printing
+      // 4. Execute printing (this will open the TCP socket, write buffer, and close)
       await printer.execute();
       logger.success(`Successfully printed job [${job.id}] on ${printerName}`);
       return true;

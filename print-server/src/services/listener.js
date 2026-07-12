@@ -1,9 +1,13 @@
 import { supabase, CONFIG } from "../config/supabase.js";
 import { printerService } from "./printer.js";
 import { logger } from "../utils/logger.js";
+import net from "net";
 
 // Cache of printer configurations to minimize DB lookups
 const printerCache = new Map();
+
+// Local in-memory set to prevent concurrent double-processing of the same job
+const processingJobs = new Set();
 
 /**
  * Supabase Realtime & Queue Listener Service
@@ -26,6 +30,9 @@ export const listenerService = {
 
     // 4. Set up real-time subscription for new print jobs
     setupPrintJobsSubscription();
+
+    // 5. Start background printer connection status checks
+    startPrinterHeartbeat();
 
     logger.success("All listener services are active and running!");
   }
@@ -96,6 +103,7 @@ function setupPrintersSubscription() {
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
         logger.success("Real-time printer configuration cache synchronization is active.");
+        refreshPrintersCache(); // Automatically refresh printer configurations on reconnect
       }
     });
 }
@@ -105,83 +113,99 @@ function setupPrintersSubscription() {
  * @param {Object} job - Print job record
  */
 async function processJob(job) {
-  // Prevent double processing if multiple events trigger
+  // Prevent double processing if already in flight locally
+  if (processingJobs.has(job.id)) {
+    logger.info(`Print job [${job.id}] is already processing in this instance. Skipping.`);
+    return;
+  }
   if (job.status === "processing" || job.status === "printed") return;
 
+  processingJobs.add(job.id);
   logger.info(`Processing print job [${job.id}] for printer: ${job.printer_id}`);
 
-  // 1. Mark job as processing
   try {
-    const { error: updateError } = await supabase
+    // 1. Claim job atomically in DB (ensures multiple client instances or double-triggers don't print twice)
+    const { data, error: updateError } = await supabase
       .from("print_jobs")
       .update({ 
         status: "processing",
         attempts: (job.attempts || 0) + 1
       })
-      .eq("id", job.id);
+      .eq("id", job.id)
+      .eq("status", "pending")
+      .select();
 
     if (updateError) throw updateError;
-  } catch (error) {
-    logger.error(`Failed to mark print job [${job.id}] as processing:`, error);
-    return;
-  }
 
-  // 2. Fetch printer details (cache first, fallback to DB)
-  let printerInfo = printerCache.get(job.printer_id);
+    if (!data || data.length === 0) {
+      logger.info(`Print job [${job.id}] was already claimed or processed. Skipping.`);
+      return;
+    }
 
-  if (!printerInfo) {
-    logger.info(`Printer [${job.printer_id}] not in cache. Fetching from database...`);
-    try {
-      const { data, error } = await supabase
-        .from("printers")
-        .select("*")
-        .eq("id", job.printer_id)
-        .single();
+    // Use the latest status from database
+    const claimedJob = data[0];
 
-      if (error || !data) {
-        throw new Error(`Printer with ID ${job.printer_id} not found in database.`);
+    // 2. Fetch printer details (cache first, fallback to DB)
+    let printerInfo = printerCache.get(claimedJob.printer_id);
+
+    if (!printerInfo) {
+      logger.info(`Printer [${claimedJob.printer_id}] not in cache. Fetching from database...`);
+      try {
+        const { data: dbPrinter, error } = await supabase
+          .from("printers")
+          .select("*")
+          .eq("id", claimedJob.printer_id)
+          .single();
+
+        if (error || !dbPrinter) {
+          throw new Error(`Printer with ID ${claimedJob.printer_id} not found in database.`);
+        }
+
+        printerInfo = dbPrinter;
+        printerCache.set(dbPrinter.id, dbPrinter); // cache it
+      } catch (error) {
+        logger.error(`Failed to retrieve printer configurations for job [${claimedJob.id}]:`, error);
+        
+        // Update job to failed
+        await supabase
+          .from("print_jobs")
+          .update({
+            status: "failed",
+            error_message: `Printer resolution failed: ${error.message}`
+          })
+          .eq("id", claimedJob.id);
+        return;
       }
+    }
 
-      printerInfo = data;
-      printerCache.set(data.id, data); // cache it
-    } catch (error) {
-      logger.error(`Failed to retrieve printer configurations for job [${job.id}]:`, error);
+    // 3. Print
+    try {
+      await printerService.print(claimedJob, printerInfo);
       
-      // Update job to failed
+      // 4. Update status to printed
+      await supabase
+        .from("print_jobs")
+        .update({
+          status: "printed",
+          error_message: null
+        })
+        .eq("id", claimedJob.id);
+    } catch (printError) {
+      // 5. Handle print failures
+      logger.error(`Print job execution failed for [${claimedJob.id}]:`, printError);
+      
       await supabase
         .from("print_jobs")
         .update({
           status: "failed",
-          error_message: `Printer resolution failed: ${error.message}`
+          error_message: printError.message || "Unknown ESC/POS network print error"
         })
-        .eq("id", job.id);
-      return;
+        .eq("id", claimedJob.id);
     }
-  }
-
-  // 3. Print
-  try {
-    await printerService.print(job, printerInfo);
-    
-    // 4. Update status to printed
-    await supabase
-      .from("print_jobs")
-      .update({
-        status: "printed",
-        error_message: null
-      })
-      .eq("id", job.id);
-  } catch (printError) {
-    // 5. Handle print failures
-    logger.error(`Print job execution failed for [${job.id}]:`, printError);
-    
-    await supabase
-      .from("print_jobs")
-      .update({
-        status: "failed",
-        error_message: printError.message || "Unknown ESC/POS network print error"
-      })
-      .eq("id", job.id);
+  } catch (err) {
+    logger.error(`Unexpected error processing job [${job.id}]:`, err);
+  } finally {
+    processingJobs.delete(job.id);
   }
 }
 
@@ -213,6 +237,7 @@ function setupPrintJobsSubscription() {
     .subscribe((status, err) => {
       if (status === "SUBSCRIBED") {
         logger.success("Real-time print job listener is active.");
+        processPendingJobsQueue(); // Poll queue to capture any missed jobs during offline state
       }
       if (err) {
         logger.error("Error subscribing to print job realtime updates:", err);
@@ -251,4 +276,79 @@ async function processPendingJobsQueue() {
   } catch (error) {
     logger.error("Failed to process pending jobs queue:", error);
   }
+}
+
+/**
+ * Start periodic printer health check ping loops
+ */
+function startPrinterHeartbeat() {
+  logger.info("Starting background printer health check heartbeat loop (every 20s)...");
+  
+  // Run immediately on startup, then every 20 seconds
+  pingAllPrinters();
+  setInterval(pingAllPrinters, 20000);
+}
+
+/**
+ * Ping each cached printer and write status to database
+ */
+async function pingAllPrinters() {
+  if (printerCache.size === 0) return;
+  
+  logger.info(`Running connection checks on ${printerCache.size} cached printers...`);
+  
+  for (const [id, printer] of printerCache.entries()) {
+    try {
+      const result = await checkPrinterConnection(printer.ip_address, printer.port);
+      
+      // Update DB with connection status
+      const { error } = await supabase
+        .from("printers")
+        .update({
+          connection_status: result.status,
+          connection_error: result.error,
+          last_connected_at: result.status === "online" ? new Date().toISOString() : (printer.last_connected_at || null)
+        })
+        .eq("id", id);
+        
+      if (error) {
+        if (error.code === "P0002" || error.message?.includes("does not exist") || error.message?.includes("column")) {
+          logger.warn(`Database schema does not support connection tracking columns yet. Please apply the SQL migration in supabase/migrations/20260712160000_printer_connection_status.sql. Printer [${printer.name}] is locally ${result.status.toUpperCase()}`);
+        } else {
+          logger.error(`Failed to update status in DB for printer ${printer.name}:`, error);
+        }
+      } else {
+        logger.info(`Printer [${printer.name}] health status check: ${result.status.toUpperCase()} ${result.error ? `(${result.error})` : ""}`);
+      }
+    } catch (err) {
+      logger.error(`Error during health check for printer ${printer.name}:`, err);
+    }
+  }
+}
+
+/**
+ * Test a TCP port/IP connection with a timeout
+ */
+function checkPrinterConnection(ip, port, timeout = 2500) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeout);
+
+    socket.on("connect", () => {
+      socket.destroy();
+      resolve({ status: "online", error: null });
+    });
+
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve({ status: "offline", error: "Connection timed out" });
+    });
+
+    socket.on("error", (err) => {
+      socket.destroy();
+      resolve({ status: "offline", error: err.message || "Connection refused" });
+    });
+
+    socket.connect(port, ip);
+  });
 }
