@@ -149,7 +149,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="space-y-6 p-6 sm:p-8 rounded-3xl border border-zinc-200/80 bg-background shadow-xl dark:border-zinc-900 animate-in zoom-in-95 duration-200">
+    <div className="space-y-6 p-6 sm:p-8 min-h-screen md:min-h-0 md:rounded-3xl md:border md:border-zinc-200/80 bg-background md:shadow-xl md:dark:border-zinc-900 animate-in zoom-in-95 duration-200 flex flex-col justify-center">
       
       {/* Brand Header */}
       <div className="text-center space-y-2 animate-in slide-in-from-top-3 duration-300">
