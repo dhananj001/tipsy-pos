@@ -227,8 +227,10 @@ export default function PrintersManagementPage() {
     }
 
     const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-    if (!ipRegex.test(formIp.trim())) {
-      setError('Please provide a valid IP address (e.g. 192.168.1.100).')
+    const trimmedIp = formIp.trim()
+    const isLocalOrSharedPath = trimmedIp.startsWith("\\\\") || trimmedIp.startsWith("//") || trimmedIp.startsWith("printer:")
+    if (!ipRegex.test(trimmedIp) && !isLocalOrSharedPath) {
+      setError('Please provide a valid IP address (e.g. 192.168.1.100) or shared printer path (e.g. \\\\localhost\\printer_name).')
       return
     }
 
@@ -934,15 +936,18 @@ export default function PrintersManagementPage() {
               {/* IP and Port row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-0.5">LAN IP Address</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-0.5">LAN IP / Shared Path</label>
                   <input 
                     type="text" 
                     value={formIp}
                     onChange={(e) => setFormIp(e.target.value)}
-                    placeholder="e.g. 192.168.1.100"
+                    placeholder="192.168.1.100 or \\localhost\rp3160"
                     className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-zinc-250 bg-background dark:border-zinc-800 text-foreground placeholder:text-zinc-400 focus:outline-none focus:border-indigo-500"
                     required
                   />
+                  <p className="text-[9px] text-muted-foreground mt-0.5">
+                    Use IP address for network printers, or Windows share path for local USB printers.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

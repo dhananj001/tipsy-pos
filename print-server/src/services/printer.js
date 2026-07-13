@@ -1,4 +1,13 @@
 import { ThermalPrinter, PrinterTypes } from "node-thermal-printer";
+
+// Extend ThermalPrinter prototype with helper methods to map to the correct library functions
+ThermalPrinter.prototype.printBoldTrue = function() {
+  this.bold(true);
+};
+ThermalPrinter.prototype.printBoldFalse = function() {
+  this.bold(false);
+};
+
 import { logger } from "../utils/logger.js";
 import { CONFIG } from "../config/supabase.js";
 
@@ -42,8 +51,15 @@ export const printerService = {
   print: async (job, printerInfo) => {
     const { ip_address, port, name: printerName } = printerInfo;
     const printerIp = ip_address.trim();
-    const printerPort = port || 9100;
-    const connectionUri = `tcp://${printerIp}:${printerPort}`;
+    
+    // Support Windows shared printer UNC paths (e.g. \\localhost\RP3160) or custom interfaces
+    let connectionUri;
+    if (printerIp.startsWith("\\\\") || printerIp.startsWith("//") || printerIp.startsWith("printer:")) {
+      connectionUri = printerIp;
+    } else {
+      const printerPort = port || 9100;
+      connectionUri = `tcp://${printerIp}:${printerPort}`;
+    }
 
     logger.info(`Attempting print job [${job.id}] on printer: ${printerName} (${connectionUri})`);
 

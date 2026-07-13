@@ -330,6 +330,10 @@ async function pingAllPrinters() {
  * Test a TCP port/IP connection with a timeout
  */
 function checkPrinterConnection(ip, port, timeout = 2500) {
+  if (ip.startsWith("\\\\") || ip.startsWith("//") || ip.startsWith("printer:")) {
+    // For USB/shared/local printers, we assume they are online since TCP port checks don't apply
+    return Promise.resolve({ status: "online", error: null });
+  }
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeout);
