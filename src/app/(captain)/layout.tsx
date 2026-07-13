@@ -49,7 +49,7 @@ export default function CaptainLayout({
   return (
     <div className="flex min-h-screen w-full justify-center bg-zinc-50 dark:bg-zinc-950">
       {/* Mobile Frame Container (Constrained width on desktop, full screen on mobile) */}
-      <div className="relative flex h-screen w-full max-w-md flex-col border-x border-zinc-200/80 bg-background shadow-2xl dark:border-zinc-900/80">
+      <div className="relative flex h-screen w-full max-w-md flex-col border-x border-zinc-200/80 bg-background shadow-2xl dark:border-zinc-900/80 overflow-hidden [transform:translateZ(0)]">
         
         {/* Sleek Top Header */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-100 bg-background/85 px-4 backdrop-blur-md dark:border-zinc-900">
