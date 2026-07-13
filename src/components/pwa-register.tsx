@@ -10,21 +10,31 @@ export function PWARegister() {
   const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
-    // 1. Register Service Worker
+    // 1. Register or Unregister Service Worker based on environment
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      const registerSW = async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js')
-          console.log('PWA: Service Worker registered successfully with scope:', registration.scope)
-        } catch (error) {
-          console.error('PWA: Service Worker registration failed:', error)
+      if (process.env.NODE_ENV === 'production') {
+        const registerSW = async () => {
+          try {
+            const registration = await navigator.serviceWorker.register('/sw.js')
+            console.log('PWA: Service Worker registered successfully with scope:', registration.scope)
+          } catch (error) {
+            console.error('PWA: Service Worker registration failed:', error)
+          }
         }
-      }
 
-      if (document.readyState === 'complete') {
-        registerSW()
+        if (document.readyState === 'complete') {
+          registerSW()
+        } else {
+          window.addEventListener('load', registerSW)
+        }
       } else {
-        window.addEventListener('load', registerSW)
+        // Dev Mode: Unregister active service workers to prevent cached stale assets
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister()
+            console.log('PWA: Service Worker unregistered for development mode')
+          }
+        })
       }
     }
 
