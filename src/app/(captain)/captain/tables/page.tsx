@@ -593,7 +593,7 @@ export default function TablesPage() {
         itemsByPrinterType[pType].push(item)
       })
 
-      const printJobsToInsert = []
+      const printJobsToInsert: any[] = []
       for (const [printerType, groupedItems] of Object.entries(itemsByPrinterType)) {
         if (groupedItems.length === 0) continue
         let matchedPrinters = printers?.filter((p: any) => p.type === printerType) || []

@@ -2,10 +2,20 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { PWARegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
   title: "Tipsy POS — Premium Restaurant Point of Sale",
   description: "High-performance, minimal and ultra-fast restaurant POS with real-time operations.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Tipsy POS",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
@@ -68,6 +78,7 @@ export default function RootLayout({
       >
         <ThemeProvider defaultTheme="system">
           <AuthProvider>
+            <PWARegister />
             {children}
           </AuthProvider>
         </ThemeProvider>
