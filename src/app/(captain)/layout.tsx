@@ -52,7 +52,7 @@ export default function CaptainLayout({
       <div className="relative flex h-screen w-full max-w-md flex-col border-x border-zinc-200/80 bg-background shadow-2xl dark:border-zinc-900/80 overflow-hidden [transform:translateZ(0)]">
         
         {/* Sleek Top Header */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-100 bg-background/85 px-4 backdrop-blur-md dark:border-zinc-900">
+        <header className="flex h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] shrink-0 items-center justify-between border-b border-zinc-100 bg-background/85 px-4 backdrop-blur-md dark:border-zinc-900">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-bold text-white shadow-md shadow-amber-500/20">
               T
@@ -85,12 +85,12 @@ export default function CaptainLayout({
         </header>
 
         {/* Dynamic Main Body Scroll Area */}
-        <main className="flex-1 overflow-y-auto px-4 py-4 pb-28">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
           {children}
         </main>
 
         {/* Floating Bottom Touch Bar Navigation */}
-        <nav className="absolute bottom-0 left-0 right-0 z-50 flex h-20 items-center justify-around border-t border-zinc-100 bg-background/95 px-6 pb-5 pt-2 shadow-lg backdrop-blur-md dark:border-zinc-900">
+        <nav className="absolute bottom-0 left-0 right-0 z-50 flex h-[calc(5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] items-center justify-around border-t border-zinc-100 bg-background/95 px-6 pt-2 shadow-lg backdrop-blur-md dark:border-zinc-900">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href

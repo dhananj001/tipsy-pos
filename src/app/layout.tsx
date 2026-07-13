@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "High-performance, minimal and ultra-fast restaurant POS with real-time operations.",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Tipsy POS",
   },
   icons: {
@@ -23,6 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
