@@ -1,4 +1,7 @@
 import { ThermalPrinter, PrinterTypes } from "node-thermal-printer";
+import fs from "fs";
+import { exec } from "child_process";
+import path from "path";
 
 // Extend ThermalPrinter prototype with helper methods to map to the correct library functions
 ThermalPrinter.prototype.printBoldTrue = function() {
@@ -92,8 +95,38 @@ export const printerService = {
       // 3. Cut Paper
       printer.cut();
 
-      // 4. Execute printing (this will open the TCP socket, write buffer, and close)
-      await printer.execute();
+      // 4. Execute printing
+      if (connectionUri.startsWith("\\\\") || connectionUri.startsWith("//")) {
+        // For USB shared printers on Windows, write the buffer to a temp file and copy it to the printer share path
+        const buffer = printer.getBuffer();
+        const tempFilePath = path.join(process.cwd(), `temp_print_${Date.now()}.bin`);
+        
+        await fs.promises.writeFile(tempFilePath, buffer);
+        
+        await new Promise((resolve, reject) => {
+          // Normalize backslashes for Windows copy command
+          const normalizedPath = connectionUri.replace(/\//g, "\\");
+          exec(`copy /B "${tempFilePath}" "${normalizedPath}"`, (error, stdout, stderr) => {
+            if (error) {
+              logger.error(`Shell copy to printer failed: ${stderr || error.message}`);
+              reject(new Error(stderr || error.message));
+            } else {
+              logger.info(`Shell copy stdout: ${stdout.trim()}`);
+              resolve();
+            }
+          });
+        });
+        
+        // Clean up temp file
+        try {
+          await fs.promises.unlink(tempFilePath);
+        } catch (e) {
+          logger.warn(`Failed to clean up temp file ${tempFilePath}: ${e.message}`);
+        }
+      } else {
+        // Standard TCP print execute
+        await printer.execute();
+      }
       logger.success(`Successfully printed job [${job.id}] on ${printerName}`);
       return true;
     } catch (error) {
