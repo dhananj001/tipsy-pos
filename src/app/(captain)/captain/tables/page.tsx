@@ -629,7 +629,7 @@ export default function TablesPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'print_jobs', filter: `restaurant_id=eq.${profile.restaurant_id}` },
-        (payload) => {
+        (payload: any) => {
           fetchPrintMonitorData()
           const newJob = payload.new as any
           if (newJob) {
