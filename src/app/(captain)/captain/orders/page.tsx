@@ -56,6 +56,7 @@ interface Order {
   tables: {
     id: string
     number: number
+    capacity: number
   } | null
   order_items: OrderItem[]
   payments: Payment[]
@@ -108,7 +109,7 @@ export default function GroupedBillsHistoryPage() {
           total_amount,
           created_at,
           table_id,
-          tables (id, number),
+          tables (id, number, capacity),
           order_items (
             id,
             quantity,
