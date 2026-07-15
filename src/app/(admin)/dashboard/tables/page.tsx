@@ -46,7 +46,7 @@ export default function AdminTablesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [taxPercent, setTaxPercent] = useState<number>(5)
-  const [vatPercent, setVatPercent] = useState<number>(0)
+  const [vatPercent, setVatPercent] = useState<number>(5)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
 
   // --- Confirmation Dialog State ---
@@ -183,7 +183,7 @@ export default function AdminTablesPage() {
       fetchActiveOrders(selectedTable.id)
       setBillingMode(false)
       setTaxPercent(5)
-      setVatPercent(0)
+      setVatPercent(5)
       setDiscountPercent(0)
     } else {
       setActiveOrders([])
@@ -211,11 +211,26 @@ export default function AdminTablesPage() {
   }
 
   const aggregatedItems = getAggregatedItems()
-  const subtotal = aggregatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const discountAmount = subtotal * (discountPercent / 100)
-  const taxableAmount = Math.max(0, subtotal - discountAmount)
-  const taxAmount = taxableAmount * (taxPercent / 100)
-  const vatAmount = taxableAmount * (vatPercent / 100)
+  
+  const gstItems = aggregatedItems.filter(item => (item.printer_type || 'kitchen').toLowerCase() !== 'bar')
+  const vatItems = aggregatedItems.filter(item => (item.printer_type || '').toLowerCase() === 'bar')
+  
+  const gstSubtotal = gstItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const vatSubtotal = vatItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  
+  const gstDiscount = gstSubtotal * (discountPercent / 100)
+  const vatDiscount = vatSubtotal * (discountPercent / 100)
+  
+  const gstTaxable = Math.max(0, gstSubtotal - gstDiscount)
+  const vatTaxable = Math.max(0, vatSubtotal - vatDiscount)
+  
+  const subtotal = gstSubtotal + vatSubtotal
+  const discountAmount = gstDiscount + vatDiscount
+  const taxableAmount = gstTaxable + vatTaxable
+  
+  const taxAmount = gstTaxable * (taxPercent / 100)
+  const vatAmount = vatTaxable * (vatPercent / 100)
+  
   const grandTotal = taxableAmount + taxAmount + vatAmount
 
   // Schedule a print job for customer receipt (BILL type)
