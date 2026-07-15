@@ -182,15 +182,16 @@ export default function GroupedBillsHistoryPage() {
   // Aggregate items calculation
   const getAggregatedItems = (order: Order | null) => {
     if (!order) return []
-    const itemMap = new Map<string, { name: string; quantity: number; price: number }>()
+    const itemMap = new Map<string, { name: string; quantity: number; price: number; printer_type?: string }>()
     order.order_items?.forEach((oi) => {
       const name = oi.menu_items?.name || 'Unknown Item'
       const price = oi.price_at_order || 0
+      const printer_type = oi.menu_items?.printer_type
       const existing = itemMap.get(name)
       if (existing) {
         existing.quantity += oi.quantity
       } else {
-        itemMap.set(name, { name, quantity: oi.quantity, price })
+        itemMap.set(name, { name, quantity: oi.quantity, price, printer_type })
       }
     })
     return Array.from(itemMap.values())
@@ -347,6 +348,7 @@ export default function GroupedBillsHistoryPage() {
           restaurantPhone: phone,
           tableName: 'Table',
           tableNumber: String(selectedBill.tables?.number || '?'),
+          capacity: selectedBill.tables?.capacity,
           captainName: profile.name || 'Captain',
           invoiceNumber: `INV-${selectedBill.id.substring(0, 5).toUpperCase()}`,
           timestamp: new Date().toISOString(),

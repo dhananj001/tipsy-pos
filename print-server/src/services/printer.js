@@ -224,10 +224,10 @@ function renderKOT(printer, payload) {
 
 /**
  * Render Customer Invoice / Bill
- * Focus: Professional receipt format with subtotal, tax details, payment method, and footer.
+ * Focus: Professional split receipt matching DotPe format (Consolidated Statement & separate GST/VAT Invoices).
  */
 function renderBill(printer, payload) {
-  const {
+  let {
     restaurantName = "Tipsy POS",
     restaurantAddress = "",
     restaurantPhone = "",
@@ -235,134 +235,273 @@ function renderBill(printer, payload) {
     tableNumber = "N/A",
     captainName = "Captain",
     invoiceNumber = "",
-    orderId = "",
     timestamp = new Date().toISOString(),
     items = [],
     subtotal = 0,
     taxPercent = 0,
-    taxAmount = 0,
     vatPercent = 0,
-    vatAmount = 0,
     discountPercent = 0,
-    discountAmount = 0,
     serviceChargePercent = 0,
-    serviceChargeAmount = 0,
-    grandTotal = 0,
-    paymentMethod = "Pending",
-    isPaid = false
+    capacity = 0,
+    gstin = "",
+    vattin = ""
   } = payload;
 
-  const formattedTime = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const formattedDate = new Date(timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' });
+  // Professional defaults matching DotPe style for "Tipsy Duckling" if not explicitly provided
+  if (restaurantName.toLowerCase().includes("tipsy") || restaurantName.toLowerCase().includes("duckling")) {
+    if (!gstin) gstin = "27AEUFS6964H1Z3";
+    if (!vattin) vattin = "2855160048V";
+    if (!restaurantAddress) restaurantAddress = "Pune";
+    if (!restaurantPhone) restaurantPhone = "9130182609";
+  }
 
-  // Restaurant Brand Header
-  printer.alignCenter();
-  printer.setTextDoubleHeight();
-  printer.printBoldTrue();
-  printer.println(restaurantName.toUpperCase());
-  printer.setTextNormal();
-  printer.printBoldFalse();
+  // Filter items by type (bar items get VAT, everything else gets GST)
+  const gstItems = items.filter(item => (item.printer_type || "kitchen").toLowerCase() !== "bar");
+  const vatItems = items.filter(item => (item.printer_type || "").toLowerCase() === "bar");
 
-  if (restaurantAddress) printer.println(restaurantAddress);
-  if (restaurantPhone) printer.println(`Phone: ${restaurantPhone}`);
-  printer.newLine();
+  const hasGst = gstItems.length > 0;
+  const hasVat = vatItems.length > 0;
 
-  // Bill Header Title
-  printer.setTextDoubleHeight();
-  printer.printBoldTrue();
-  printer.println(isPaid ? "PAID INVOICE" : "ESTIMATE BILL");
-  printer.setTextNormal();
-  printer.printBoldFalse();
-  printer.newLine();
+  // Helper functions for formatting
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formatDateTime = (isoString) => {
+    const date = new Date(isoString);
+    const m = months[date.getMonth()];
+    const d = String(date.getDate()).padStart(2, '0');
+    const y = date.getFullYear();
+    let hrs = date.getHours();
+    const mins = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hrs >= 12 ? 'AM' : 'AM'; // Match AM/PM correctly
+    const displayAmpm = hrs >= 12 ? 'AM' : 'AM'; // For mock consistency if preferred, let's keep real AM/PM
+    const actualAmpm = hrs >= 12 ? 'PM' : 'AM';
+    hrs = hrs % 12;
+    hrs = hrs ? hrs : 12;
+    const hrsStr = String(hrs).padStart(2, '0');
+    return `${m} ${d} ${y} ${hrsStr}:${mins} ${actualAmpm}`;
+  };
 
-  // Metadata
-  printer.alignLeft();
-  printer.println(`Date: ${formattedDate}   Time: ${formattedTime}`);
-  if (invoiceNumber) printer.println(`Invoice: ${invoiceNumber}`);
-  printer.println(`${tableName}: ${tableNumber} | Captain: ${captainName}`);
-  printer.drawLine();
+  const formattedDateTime = formatDateTime(timestamp);
 
-  // Columns: Qty & Item (32 chars) | Price (8 chars) | Total (8 chars)
-  printer.printBoldTrue();
-  printer.println(
-    padRight("QTY & ITEM", 30) + 
-    padLeft("PRICE", 9) + 
-    padLeft("TOTAL", 9)
-  );
-  printer.printBoldFalse();
-  printer.drawLine();
+  // Calculate values for GST group
+  const gstSubtotal = gstItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const gstDiscount = gstSubtotal * (discountPercent / 100);
+  const gstTaxable = Math.max(0, gstSubtotal - gstDiscount);
+  const cgstAmount = gstTaxable * (taxPercent / 2 / 100);
+  const sgstAmount = gstTaxable * (taxPercent / 2 / 100);
+  const gstServiceCharge = gstSubtotal * (serviceChargePercent / 100);
+  const gstTotal = gstTaxable + cgstAmount + sgstAmount + gstServiceCharge;
 
-  // List Items
-  items.forEach(item => {
-    const itemTotal = (item.quantity * item.price).toFixed(2);
-    const priceStr = parseFloat(item.price).toFixed(2);
-    
-    // Format description
-    const qtyAndName = `${item.quantity} x ${item.name}`;
-    
-    if (qtyAndName.length <= 30) {
-      printer.println(
-        padRight(qtyAndName, 30) + 
-        padLeft(priceStr, 9) + 
-        padLeft(itemTotal, 9)
-      );
+  // Calculate values for VAT group
+  const vatSubtotal = vatItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const vatDiscount = vatSubtotal * (discountPercent / 100);
+  const vatTaxable = Math.max(0, vatSubtotal - vatDiscount);
+  const vatAmountCalculated = vatTaxable * (vatPercent / 100);
+  const vatServiceCharge = vatSubtotal * (serviceChargePercent / 100);
+  const vatTotal = vatTaxable + vatAmountCalculated + vatServiceCharge;
+
+  const totalBeforeRounding = (hasGst ? gstTotal : 0) + (hasVat ? vatTotal : 0);
+  const totalRounded = Math.round(totalBeforeRounding);
+
+  const drawCustomLine = () => {
+    printer.println("-".repeat(48));
+  };
+
+  const formatInvoiceRow = (name, qty, rate, amount) => {
+    const qtyStr = String(qty);
+    const rateStr = parseFloat(rate).toFixed(0);
+    const amountStr = parseFloat(amount).toFixed(2);
+
+    if (name.length <= 24) {
+      return padRight(name, 26) + padLeft(qtyStr, 5) + padLeft(rateStr, 7) + padLeft(amountStr, 10);
     } else {
-      // Wrap text cleanly if long item name
-      printer.println(qtyAndName.substring(0, 30));
-      printer.println(
-        padRight("  " + qtyAndName.substring(30), 30) + 
-        padLeft(priceStr, 9) + 
-        padLeft(itemTotal, 9)
-      );
+      const line1 = name.substring(0, 24);
+      const line2 = name.substring(24);
+      return padRight(line1, 26) + padLeft(qtyStr, 5) + padLeft(rateStr, 7) + padLeft(amountStr, 10) + "\n" + padRight("  " + line2, 48);
     }
-  });
-  printer.drawLine();
+  };
 
-  // Totals Section
-  printer.alignRight();
-  printer.println(`Subtotal: ${padLeft(parseFloat(subtotal).toFixed(2), 10)}`);
+  // Helper to print a single invoice section
+  const printInvoiceSection = (title, secItems, secSubtotal, secDiscount, secServiceCharge, isGstSec, isVatSec, secTotal) => {
+    printer.alignCenter();
+    printer.printBoldTrue();
+    printer.println(title);
+    printer.printBoldFalse();
+    printer.newLine();
 
-  if (discountPercent > 0 || discountAmount > 0) {
-    const discountLabel = `Discount (${discountPercent}%):`;
-    printer.println(`${discountLabel} ${padLeft(parseFloat(-discountAmount).toFixed(2), 10)}`);
+    // Table / Pax
+    printer.setTextDoubleHeight();
+    printer.setTextDoubleWidth();
+    printer.printBoldTrue();
+    const paxStr = capacity ? ` (Pax - ${capacity})` : '';
+    printer.println(`${tableName === 'Table' ? 'H' : tableName}${tableNumber}${paxStr}`);
+    printer.setTextNormal();
+    printer.printBoldFalse();
+    printer.newLine();
+
+    // Metadata
+    printer.alignLeft();
+    const totalSecQty = secItems.reduce((sum, item) => sum + item.quantity, 0);
+    const invoiceNoSuffix = isGstSec ? "-A" : isVatSec ? "-B" : "";
+    const displayInvoiceNo = invoiceNumber ? `${invoiceNumber}${invoiceNoSuffix}` : "";
+    
+    printer.println(
+      padRight(`Order ${displayInvoiceNo}`, 24) + 
+      padLeft(`${secItems.length} ${secItems.length === 1 ? 'item' : 'items'} (${totalSecQty} Qty)`, 24)
+    );
+    printer.println(
+      padRight(formattedDateTime, 24) + 
+      padLeft(captainName, 24)
+    );
+    drawCustomLine();
+
+    // Table Header
+    printer.printBoldTrue();
+    printer.println(
+      padRight("Name", 26) + 
+      padLeft("Qty", 5) + 
+      padLeft("Rate", 7) + 
+      padLeft("Amount", 10)
+    );
+    printer.printBoldFalse();
+    drawCustomLine();
+
+    // Items
+    secItems.forEach(item => {
+      const rowStr = formatInvoiceRow(item.name, item.quantity, item.price, item.quantity * item.price);
+      printer.println(rowStr);
+    });
+    drawCustomLine();
+
+    // Totals
+    printer.alignRight();
+    printer.println(padRight("Sub Total", 34) + padLeft(secSubtotal.toFixed(2), 14));
+
+    if (secDiscount > 0) {
+      printer.println(padRight(`Discount (${discountPercent}%):`, 34) + padLeft((-secDiscount).toFixed(2), 14));
+    }
+
+    if (isGstSec) {
+      if (cgstAmount > 0) {
+        printer.println(padRight(`CGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(cgstAmount.toFixed(2), 14));
+      }
+      if (sgstAmount > 0) {
+        printer.println(padRight(`SGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(sgstAmount.toFixed(2), 14));
+      }
+    }
+
+    if (isVatSec) {
+      if (vatAmountCalculated > 0) {
+        printer.println(padRight(`VAT ${vatPercent.toFixed(1)}% on ${vatTaxable.toFixed(2)}`, 34) + padLeft(vatAmountCalculated.toFixed(2), 14));
+      }
+    }
+
+    if (secServiceCharge > 0) {
+      printer.println(padRight(`Service Charge (${serviceChargePercent}%):`, 34) + padLeft(secServiceCharge.toFixed(2), 14));
+    }
+
+    drawCustomLine();
+    printer.printBoldTrue();
+    printer.println(padRight("Bill Total", 34) + padLeft(secTotal.toFixed(2), 14));
+    printer.printBoldFalse();
+    printer.newLine();
+
+    // Footer
+    printer.alignCenter();
+    printer.printBoldTrue();
+    printer.println(restaurantName);
+    printer.printBoldFalse();
+    if (restaurantAddress) printer.println(restaurantAddress);
+    if (restaurantPhone) printer.println(restaurantPhone);
+    if (isVatSec && vattin) {
+      printer.println(`VATTIN - ${vattin}`);
+    } else if (isGstSec && gstin) {
+      printer.println(`GSTIN - ${gstin}`);
+    }
+    printer.newLine();
+  };
+
+  // CASE 1: Both GST and VAT items are present -> Print Statement followed by split invoices
+  if (hasGst && hasVat) {
+    // ---- 1. STATEMENT ----
+    printer.alignCenter();
+    printer.printBoldTrue();
+    printer.println("Statement");
+    printer.printBoldFalse();
+    printer.newLine();
+
+    printer.setTextDoubleHeight();
+    printer.setTextDoubleWidth();
+    printer.printBoldTrue();
+    const paxStr = capacity ? ` (Pax - ${capacity})` : '';
+    printer.println(`${tableName === 'Table' ? 'H' : tableName}${tableNumber}${paxStr}`);
+    printer.setTextNormal();
+    printer.printBoldFalse();
+    printer.newLine();
+
+    printer.alignLeft();
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+    printer.println(
+      padRight(`Statement ${invoiceNumber}`, 24) + 
+      padLeft(`${items.length} ${items.length === 1 ? 'item' : 'items'} (${totalQty} Qty)`, 24)
+    );
+    printer.println(
+      padRight(formattedDateTime, 24) + 
+      padLeft(captainName, 24)
+    );
+    drawCustomLine();
+
+    printer.printBoldTrue();
+    printer.println(padRight("Name", 34) + padLeft("Amount", 14));
+    printer.printBoldFalse();
+    drawCustomLine();
+
+    // 1. Invoice (GST items total)
+    printer.println(padRight("1. Invoice", 34) + padLeft(gstTotal.toFixed(2), 14));
+    // 2. Invoice (VAT items total)
+    printer.println(padRight("2. Invoice", 34) + padLeft(vatTotal.toFixed(2), 14));
+    drawCustomLine();
+
+    printer.alignRight();
+    printer.println(padRight("Bill Total", 34) + padLeft(totalBeforeRounding.toFixed(2), 14));
+    printer.newLine();
+    printer.printBoldTrue();
+    printer.println(padRight("Bill Total (rounded)", 34) + padLeft(totalRounded.toFixed(2), 14));
+    printer.printBoldFalse();
+    drawCustomLine();
+
+    // Statement Footer
+    printer.alignCenter();
+    printer.println("Powered by www.dotpe.in");
+    if (gstin) {
+      printer.println(`GSTIN - ${gstin}`);
+    }
+    printer.newLine();
+
+    // Cut paper and proceed to GST invoice
+    printer.cut();
+
+    // ---- 2. GST INVOICE ----
+    printInvoiceSection("Order (Invoice)", gstItems, gstSubtotal, gstDiscount, gstServiceCharge, true, false, gstTotal);
+
+    // Cut paper and proceed to VAT invoice
+    printer.cut();
+
+    // ---- 3. VAT INVOICE ----
+    printInvoiceSection("Order (Invoice)", vatItems, vatSubtotal, vatDiscount, vatServiceCharge, false, true, vatTotal);
   }
-  
-  if (taxPercent > 0 || taxAmount > 0) {
-    const taxLabel = `GST (${taxPercent}%):`;
-    printer.println(`${taxLabel} ${padLeft(parseFloat(taxAmount).toFixed(2), 10)}`);
+  // CASE 2: Only GST items exist
+  else if (hasGst) {
+    printInvoiceSection("Order (Invoice)", gstItems, gstSubtotal, gstDiscount, gstServiceCharge, true, false, gstTotal);
   }
-
-  if (vatPercent > 0 || vatAmount > 0) {
-    const vatLabel = `VAT (${vatPercent}%):`;
-    printer.println(`${vatLabel} ${padLeft(parseFloat(vatAmount).toFixed(2), 10)}`);
+  // CASE 3: Only VAT items exist
+  else if (hasVat) {
+    printInvoiceSection("Order (Invoice)", vatItems, vatSubtotal, vatDiscount, vatServiceCharge, false, true, vatTotal);
   }
-
-  if (serviceChargePercent > 0 || serviceChargeAmount > 0) {
-    const scLabel = `Service Charge (${serviceChargePercent}%):`;
-    printer.println(`${scLabel} ${padLeft(parseFloat(serviceChargeAmount).toFixed(2), 10)}`);
+  // fallback for empty items
+  else {
+    printer.alignCenter();
+    printer.println("NO ITEMS TO PRINT");
   }
-  
-  printer.drawLine();
-  printer.setTextDoubleHeight();
-  printer.printBoldTrue();
-  printer.println(`GRAND TOTAL: ${padLeft(parseFloat(grandTotal).toFixed(2), 10)}`);
-  printer.setTextNormal();
-  printer.printBoldFalse();
-  printer.newLine();
-
-  // Payment Mode
-  printer.alignLeft();
-  printer.println(`Payment Mode: ${paymentMethod.toUpperCase()}`);
-  printer.println(`Payment Status: ${isPaid ? "COMPLETED" : "UNPAID"}`);
-  printer.drawLine();
-
-  // Footer Message
-  printer.alignCenter();
-  printer.printBoldTrue();
-  printer.println("THANK YOU FOR DINING WITH US!");
-  printer.printBoldFalse();
-  printer.println("Please visit again.");
-  printer.newLine();
 }
 
 /**

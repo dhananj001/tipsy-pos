@@ -193,7 +193,8 @@ export default function TablesPage() {
               notes,
               menu_items (
                 name,
-                price
+                price,
+                printer_type
               )
             )
           )
@@ -230,7 +231,8 @@ export default function TablesPage() {
                 notes,
                 menu_items (
                   name,
-                  price
+                  price,
+                  printer_type
                 )
               )
             )
@@ -270,7 +272,8 @@ export default function TablesPage() {
             notes,
             menu_items (
               name,
-              price
+              price,
+              printer_type
             )
           )
         `)
@@ -799,6 +802,7 @@ export default function TablesPage() {
         restaurantPhone,
         tableName: 'Table',
         tableNumber: String(selectedTable.number),
+        capacity: selectedTable.capacity,
         captainName: profile.name || 'Captain',
         invoiceNumber: `INV-${orderId ? orderId.substring(0, 5).toUpperCase() : Math.floor(100000 + Math.random() * 900000).toString()}`,
         timestamp: new Date().toISOString(),
@@ -918,16 +922,17 @@ export default function TablesPage() {
   }, [selectedTable])
 
   const getAggregatedItems = () => {
-    const itemMap = new Map<string, { name: string; quantity: number; price: number }>()
+    const itemMap = new Map<string, { name: string; quantity: number; price: number; printer_type?: string }>()
     activeOrders.forEach(order => {
       order.order_items?.forEach((oi: any) => {
         const name = oi.menu_items?.name || 'Unknown'
         const price = oi.price_at_order || 0
+        const printer_type = oi.menu_items?.printer_type
         const existing = itemMap.get(name)
         if (existing) {
           existing.quantity += oi.quantity
         } else {
-          itemMap.set(name, { name, quantity: oi.quantity, price })
+          itemMap.set(name, { name, quantity: oi.quantity, price, printer_type })
         }
       })
     })
