@@ -107,6 +107,12 @@ export default function TablesPage() {
     onConfirm: () => void | Promise<void>
   } | null>(null)
 
+  // --- Print Monitor States ---
+  const [activePrinters, setActivePrinters] = useState<any[]>([])
+  const [recentPrintJobs, setRecentPrintJobs] = useState<any[]>([])
+  const [showPrintMonitor, setShowPrintMonitor] = useState(false)
+  const [newJobToast, setNewJobToast] = useState<{ id: string; type: string; status: string; message: string } | null>(null)
+
   const triggerSendKOT = () => {
     if (cart.length === 0) return
     setConfirmDialog({
@@ -546,6 +552,120 @@ export default function TablesPage() {
       setCart([])
     }
   }, [profile?.restaurant_id, selectedTable, viewMode])
+
+  // --- Print Monitor Data Fetch & Subscription ---
+  const fetchPrintMonitorData = async () => {
+    if (!profile?.restaurant_id) return
+    try {
+      const { data: printersData } = await supabase
+        .from('printers')
+        .select('id, name, type, ip_address, connection_status, connection_error')
+        .eq('restaurant_id', profile.restaurant_id)
+        .eq('is_active', true)
+      if (printersData) {
+        setActivePrinters(printersData)
+      }
+
+      const { data: jobsData } = await supabase
+        .from('print_jobs')
+        .select('id, payload, status, error_message, created_at')
+        .eq('restaurant_id', profile.restaurant_id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (jobsData) {
+        setRecentPrintJobs(jobsData)
+      }
+    } catch (e) {
+      console.error('Error fetching print monitor data:', e)
+    }
+  }
+
+  const handleRetryPrintJob = async (jobId: string) => {
+    try {
+      const { error } = await supabase
+        .from('print_jobs')
+        .update({
+          status: 'pending',
+          attempts: 0,
+          error_message: null
+        })
+        .eq('id', jobId)
+      if (error) throw error
+      fetchPrintMonitorData()
+    } catch (e: any) {
+      console.error('Failed to retry print job:', e)
+    }
+  }
+
+  const handleCancelPrintJob = async (jobId: string) => {
+    try {
+      const { error } = await supabase
+        .from('print_jobs')
+        .delete()
+        .eq('id', jobId)
+      if (error) throw error
+      fetchPrintMonitorData()
+    } catch (e: any) {
+      console.error('Failed to cancel print job:', e)
+    }
+  }
+
+  useEffect(() => {
+    if (!profile?.restaurant_id) return
+    
+    fetchPrintMonitorData()
+
+    const printersChannel = supabase
+      .channel('realtime_printers_monitor')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'printers', filter: `restaurant_id=eq.${profile.restaurant_id}` },
+        () => { fetchPrintMonitorData() }
+      )
+      .subscribe()
+
+    const jobsChannel = supabase
+      .channel('realtime_jobs_monitor')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'print_jobs', filter: `restaurant_id=eq.${profile.restaurant_id}` },
+        (payload) => {
+          fetchPrintMonitorData()
+          const newJob = payload.new as any
+          if (newJob) {
+            const type = newJob.payload?.type || 'PRINT'
+            const status = newJob.status
+            const errorMsg = newJob.error_message
+            const tableNo = newJob.payload?.tableNumber || ''
+            
+            let message = ''
+            if (status === 'printed') {
+              message = `${type} for Table ${tableNo} printed successfully.`
+            } else if (status === 'failed') {
+              message = `Failed printing ${type} for Table ${tableNo}: ${errorMsg || 'unknown error'}`
+            }
+
+            if (message) {
+              setNewJobToast({
+                id: newJob.id,
+                type,
+                status,
+                message
+              })
+              setTimeout(() => {
+                setNewJobToast(prev => prev?.id === newJob.id ? null : prev)
+              }, 4000)
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(printersChannel)
+      supabase.removeChannel(jobsChannel)
+    }
+  }, [profile?.restaurant_id])
 
   const saveCartState = (newCart: CartItem[]) => {
     setCart(newCart)
@@ -1026,13 +1146,35 @@ export default function TablesPage() {
               <h2 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white mt-0.5">Tables Terminal</h2>
             </div>
             
-            <button
-              onClick={() => fetchTables(true)}
-              disabled={syncing}
-              className="flex h-9 w-9 items-center justify-center rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-90 transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPrintMonitor(true)}
+                className={`flex items-center gap-2 h-9 px-3 rounded-2xl border text-xs font-bold transition-all active:scale-95 shadow-sm bg-white dark:bg-zinc-900 ${
+                  activePrinters.length === 0
+                    ? 'border-zinc-200 text-zinc-400 dark:border-zinc-800'
+                    : activePrinters.some(p => p.connection_status === 'offline')
+                    ? 'border-red-200 text-red-500 dark:border-red-950/50 bg-red-500/5 hover:bg-red-500/10'
+                    : 'border-emerald-200 text-emerald-600 dark:border-emerald-950/50 bg-emerald-500/5 hover:bg-emerald-500/10'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                  activePrinters.length === 0
+                    ? 'bg-zinc-300'
+                    : activePrinters.some(p => p.connection_status === 'offline')
+                    ? 'bg-red-500 animate-pulse'
+                    : 'bg-emerald-500'
+                }`} />
+                <span className="text-[10px] tracking-tight">Printers</span>
+              </button>
+
+              <button
+                onClick={() => fetchTables(true)}
+                disabled={syncing}
+                className="flex h-9 w-9 items-center justify-center rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-900 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-90 transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -1723,6 +1865,156 @@ export default function TablesPage() {
               >
                 {confirmDialog.confirmText}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Job Toast Notification */}
+      {newJobToast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border animate-in fade-in slide-in-from-top-4 duration-300 bg-white dark:bg-zinc-900 ${
+          newJobToast.status === 'printed' 
+            ? 'border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+            : 'border-red-500/20 text-red-500 dark:text-red-400'
+        }`}>
+          {newJobToast.status === 'printed' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+          )}
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              {newJobToast.type} Print {newJobToast.status === 'printed' ? 'Success' : 'Failed'}
+            </span>
+            <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold mt-0.5">{newJobToast.message}</span>
+          </div>
+          <button 
+            onClick={() => setNewJobToast(null)}
+            className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 p-0.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-1.5 shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Printers & Print Jobs Monitor Modal */}
+      {showPrintMonitor && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-[100] animate-in fade-in duration-200 p-4">
+          <div 
+            className="fixed inset-0 bg-transparent" 
+            onClick={() => setShowPrintMonitor(false)} 
+          />
+          <div className="relative z-10 bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-sm p-5 border border-zinc-200/60 dark:border-zinc-800 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 text-left">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[8px] font-black text-orange-500 uppercase tracking-widest leading-none">POS Hardware</span>
+                <h3 className="text-xs font-black tracking-wider text-zinc-900 dark:text-white mt-1 uppercase">Printer Terminal</h3>
+              </div>
+              <button 
+                onClick={() => setShowPrintMonitor(false)}
+                className="p-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-zinc-400 dark:text-zinc-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* List of Printers */}
+            <div className="space-y-1.5">
+              <h4 className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Active Devices</h4>
+              {activePrinters.length === 0 ? (
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold">No active printers configured.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {activePrinters.map(p => (
+                    <div 
+                      key={p.id} 
+                      title={`${p.type.toUpperCase()} • ${p.ip_address}`}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold border transition-all ${
+                        p.connection_status === 'offline'
+                          ? 'bg-red-500/5 border-red-500/10 text-red-550'
+                          : 'bg-emerald-500/5 border-emerald-500/10 text-emerald-650 dark:text-emerald-400'
+                      }`}
+                    >
+                      <div className={`w-1 h-1 rounded-full shrink-0 ${
+                        p.connection_status === 'offline' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'
+                      }`} />
+                      <span>{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* List of Recent Print Jobs */}
+            <div className="space-y-2">
+              <h4 className="text-[9px] font-black text-zinc-400 uppercase tracking-wider">Recent Jobs</h4>
+              {recentPrintJobs.length === 0 ? (
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold">No recent print jobs.</p>
+              ) : (
+                <div className="grid gap-1.5 max-h-[220px] overflow-y-auto pr-1">
+                  {recentPrintJobs.map(job => {
+                    const type = job.payload?.type || 'PRINT'
+                    const table = job.payload?.tableNumber || '?'
+                    const time = new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    
+                    return (
+                      <div key={job.id} className="p-2.5 rounded-2xl bg-zinc-55/30 dark:bg-zinc-800/10 border border-zinc-100/60 dark:border-zinc-850 text-[10px] space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col">
+                            <span className="font-extrabold text-zinc-700 dark:text-zinc-300">{type} (T{table})</span>
+                            <span className="text-[8px] text-zinc-400 dark:text-zinc-550 font-bold mt-0.5">{time}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-black uppercase text-[7.5px] tracking-widest ${
+                              job.status === 'printed'
+                                ? 'text-emerald-650 dark:text-emerald-400'
+                                : job.status === 'failed'
+                                ? 'text-red-500'
+                                : 'text-orange-500 animate-pulse'
+                            }`}>
+                              {job.status}
+                            </span>
+                            
+                            {/* Action Buttons for non-completed jobs */}
+                            {job.status !== 'printed' && (
+                              <div className="flex items-center gap-1 ml-1 border-l border-zinc-200 dark:border-zinc-800/80 pl-1.5">
+                                <button
+                                  onClick={() => handleRetryPrintJob(job.id)}
+                                  title="Retry Print"
+                                  className="p-1 hover:bg-zinc-150 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-550 dark:text-zinc-400 active:scale-90"
+                                >
+                                  <RefreshCw className="w-2.5 h-2.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleCancelPrintJob(job.id)}
+                                  title="Cancel Print"
+                                  className="p-1 hover:bg-zinc-150 dark:hover:bg-zinc-800 rounded-md transition-colors text-zinc-550 dark:text-zinc-400 active:scale-90"
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Error Message display */}
+                        {job.status === 'failed' && job.error_message && (
+                          <div className="text-[7.5px] text-red-550 dark:text-red-400 font-semibold bg-red-500/5 p-1.5 rounded-lg border border-red-500/10 leading-normal">
+                            Reason: {job.error_message}
+                          </div>
+                        )}
+
+                        {/* Pending details display */}
+                        {job.status === 'pending' && (
+                          <div className="text-[7.5px] text-orange-550 dark:text-orange-400 font-semibold bg-orange-500/5 p-1.5 rounded-lg leading-normal">
+                            Waiting in printer queue...
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
