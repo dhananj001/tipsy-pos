@@ -78,6 +78,7 @@ export default function GroupedBillsHistoryPage() {
 
   // Edit Bill States
   const [taxPercent, setTaxPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(0)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [serviceChargePercent, setServiceChargePercent] = useState<number>(0)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
@@ -173,6 +174,7 @@ export default function GroupedBillsHistoryPage() {
       }
       setDiscountPercent(0)
       setTaxPercent(5)
+      setVatPercent(0)
       setServiceChargePercent(0)
     }
   }, [selectedBill])
@@ -200,8 +202,9 @@ export default function GroupedBillsHistoryPage() {
   const discountAmount = subtotal * (discountPercent / 100)
   const taxableAmount = Math.max(0, subtotal - discountAmount)
   const taxAmount = taxableAmount * (taxPercent / 100)
+  const vatAmount = taxableAmount * (vatPercent / 100)
   const serviceChargeAmount = subtotal * (serviceChargePercent / 100)
-  const grandTotal = taxableAmount + taxAmount + serviceChargeAmount
+  const grandTotal = taxableAmount + taxAmount + vatAmount + serviceChargeAmount
 
   // Update item quantity directly inside active orders from details pane
   const handleUpdateItemQuantity = async (orderId: string, itemName: string, currentQty: number, change: number) => {
@@ -351,6 +354,8 @@ export default function GroupedBillsHistoryPage() {
           subtotal,
           taxPercent,
           taxAmount,
+          vatPercent,
+          vatAmount,
           discountPercent,
           discountAmount,
           serviceChargePercent,
@@ -771,6 +776,30 @@ export default function GroupedBillsHistoryPage() {
                   </div>
                 </div>
 
+                {/* VAT Select */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                    <span>VAT %</span>
+                    <span className="text-foreground font-black text-xs">{vatPercent}% (₹{vatAmount.toFixed(1)})</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 5, 10, 14.5, 20].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setVatPercent(val)}
+                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
+                          vatPercent === val 
+                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
+                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
+                        }`}
+                      >
+                        {val}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Service Charge Select */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
@@ -811,6 +840,10 @@ export default function GroupedBillsHistoryPage() {
                 <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
                   <span>GST Tax ({taxPercent}%)</span>
                   <span className="font-bold text-foreground">₹{taxAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                  <span>VAT ({vatPercent}%)</span>
+                  <span className="font-bold text-foreground">₹{vatAmount.toFixed(2)}</span>
                 </div>
                 {serviceChargePercent > 0 && (
                   <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">

@@ -241,6 +241,12 @@ function renderBill(printer, payload) {
     subtotal = 0,
     taxPercent = 0,
     taxAmount = 0,
+    vatPercent = 0,
+    vatAmount = 0,
+    discountPercent = 0,
+    discountAmount = 0,
+    serviceChargePercent = 0,
+    serviceChargeAmount = 0,
     grandTotal = 0,
     paymentMethod = "Pending",
     isPaid = false
@@ -315,10 +321,25 @@ function renderBill(printer, payload) {
   // Totals Section
   printer.alignRight();
   printer.println(`Subtotal: ${padLeft(parseFloat(subtotal).toFixed(2), 10)}`);
+
+  if (discountPercent > 0 || discountAmount > 0) {
+    const discountLabel = `Discount (${discountPercent}%):`;
+    printer.println(`${discountLabel} ${padLeft(parseFloat(-discountAmount).toFixed(2), 10)}`);
+  }
   
   if (taxPercent > 0 || taxAmount > 0) {
-    const taxLabel = `Tax (${taxPercent}%):`;
+    const taxLabel = `GST (${taxPercent}%):`;
     printer.println(`${taxLabel} ${padLeft(parseFloat(taxAmount).toFixed(2), 10)}`);
+  }
+
+  if (vatPercent > 0 || vatAmount > 0) {
+    const vatLabel = `VAT (${vatPercent}%):`;
+    printer.println(`${vatLabel} ${padLeft(parseFloat(vatAmount).toFixed(2), 10)}`);
+  }
+
+  if (serviceChargePercent > 0 || serviceChargeAmount > 0) {
+    const scLabel = `Service Charge (${serviceChargePercent}%):`;
+    printer.println(`${scLabel} ${padLeft(parseFloat(serviceChargeAmount).toFixed(2), 10)}`);
   }
   
   printer.drawLine();

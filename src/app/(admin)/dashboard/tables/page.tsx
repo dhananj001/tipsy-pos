@@ -45,6 +45,54 @@ export default function AdminTablesPage() {
   const [billingMode, setBillingMode] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
   const [submittingPayment, setSubmittingPayment] = useState(false)
+  const [taxPercent, setTaxPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(0)
+  const [discountPercent, setDiscountPercent] = useState<number>(0)
+
+  // --- Confirmation Dialog State ---
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    cancelText?: string
+    onConfirm: () => void | Promise<void>
+  } | null>(null)
+
+  const triggerPrintBill = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Print Bill Ticket?',
+      description: `Request print server to print receipt invoice for Table ${selectedTable?.number}?`,
+      confirmText: 'Yes, Print',
+      onConfirm: () => printBill(false)
+    })
+  }
+
+  const triggerClearTable = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Clear Table & Settle?',
+      description: `Process settlement and clear Table ${selectedTable?.number}? Active running orders will be finalized.`,
+      confirmText: 'Yes, Settle & Clear',
+      onConfirm: handleCheckout
+    })
+  }
+
+  const triggerUpdateTableStatus = (status: 'available' | 'occupied' | 'billing') => {
+    const statusLabels = {
+      available: 'Available',
+      occupied: 'Occupied',
+      billing: 'Billing'
+    }
+    setConfirmDialog({
+      isOpen: true,
+      title: `Change Status to ${statusLabels[status]}?`,
+      description: `Mark Table ${selectedTable?.number} status as ${statusLabels[status]}?`,
+      confirmText: `Mark ${statusLabels[status]}`,
+      onConfirm: () => updateTableStatus(selectedTable!.id, status)
+    })
+  }
 
   const supabase = createClient()
 
@@ -133,6 +181,9 @@ export default function AdminTablesPage() {
     if (selectedTable && selectedTable.status !== 'available') {
       fetchActiveOrders(selectedTable.id)
       setBillingMode(false)
+      setTaxPercent(5)
+      setVatPercent(0)
+      setDiscountPercent(0)
     } else {
       setActiveOrders([])
       setBillingMode(false)
@@ -159,9 +210,11 @@ export default function AdminTablesPage() {
 
   const aggregatedItems = getAggregatedItems()
   const subtotal = aggregatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const taxPercent = 5 // Standard 5% POS GST
-  const taxAmount = subtotal * (taxPercent / 100)
-  const grandTotal = subtotal + taxAmount
+  const discountAmount = subtotal * (discountPercent / 100)
+  const taxableAmount = Math.max(0, subtotal - discountAmount)
+  const taxAmount = taxableAmount * (taxPercent / 100)
+  const vatAmount = taxableAmount * (vatPercent / 100)
+  const grandTotal = taxableAmount + taxAmount + vatAmount
 
   // Schedule a print job for customer receipt (BILL type)
   const printBill = async (isPaid: boolean) => {
@@ -226,6 +279,10 @@ export default function AdminTablesPage() {
         subtotal,
         taxPercent,
         taxAmount,
+        vatPercent,
+        vatAmount,
+        discountPercent,
+        discountAmount,
         grandTotal,
         paymentMethod: isPaid ? paymentMethod : 'Pending',
         isPaid
@@ -279,7 +336,6 @@ export default function AdminTablesPage() {
 
       if (ordersUpdateErr) throw ordersUpdateErr
 
-      await printBill(true)
       await updateTableStatus(selectedTable.id, 'available')
       setSelectedTable(null)
     } catch (e: any) {
@@ -549,37 +605,98 @@ export default function AdminTablesPage() {
                       </div>
                     ) : (
                       <>
+                        {/* Summary Header */}
+                        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1.5 shrink-0 text-[10px] font-bold text-zinc-400">
+                          <span className="uppercase tracking-widest">Order Summary</span>
+                          <span>{aggregatedItems.length} items</span>
+                        </div>
+
                         {/* aggregated dishes list */}
-                        <div className="space-y-2">
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block px-1">Aggregated Dishes</span>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {aggregatedItems.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-900 bg-zinc-50/20 dark:bg-zinc-950/20 text-xs font-semibold">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-indigo-550 font-black">x{item.quantity}</span>
-                                  <span className="text-foreground truncate max-w-[150px]">{item.name}</span>
-                                </div>
-                                <div className="font-black text-foreground">
-                                  ₹{(item.price * item.quantity).toFixed(2)}
-                                </div>
+                        <div className="space-y-2.5 max-h-40 overflow-y-auto scrollbar-none pr-1">
+                          {aggregatedItems.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-[11px] font-bold text-zinc-800 dark:text-zinc-200">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-indigo-650 font-black shrink-0">x{item.quantity}</span>
+                                <span className="truncate text-foreground font-extrabold">{item.name}</span>
                               </div>
-                            ))}
+                              <span className="font-black font-mono text-foreground shrink-0">₹{(item.price * item.quantity).toFixed(0)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Adjustments Editor */}
+                        <div className="grid grid-cols-3 gap-2 bg-zinc-50/50 dark:bg-zinc-900/40 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-850">
+                          {/* Discount */}
+                          <div className="space-y-0.5">
+                            <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">Discount</span>
+                            <select
+                              value={discountPercent}
+                              onChange={(e) => setDiscountPercent(Number(e.target.value))}
+                              className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              {[0, 5, 10, 15, 20].map(val => (
+                                <option key={val} value={val}>{val}% Off</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* GST */}
+                          <div className="space-y-0.5">
+                            <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">GST Tax</span>
+                            <select
+                              value={taxPercent}
+                              onChange={(e) => setTaxPercent(Number(e.target.value))}
+                              className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              {[0, 5, 12, 18, 28].map(val => (
+                                <option key={val} value={val}>{val}% GST</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* VAT */}
+                          <div className="space-y-0.5">
+                            <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">VAT</span>
+                            <select
+                              value={vatPercent}
+                              onChange={(e) => setVatPercent(Number(e.target.value))}
+                              className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              {[0, 5, 10, 14.5, 20].map(val => (
+                                <option key={val} value={val}>{val}% VAT</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
 
-                        {/* Calculations Panel */}
-                        <div className="border-t border-b border-zinc-100 dark:border-zinc-900 py-3.5 space-y-2">
-                          <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                        {/* Calculations Panel (Sleek receipt-card style) */}
+                        <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-850/80 space-y-2 text-[10.5px] font-bold text-zinc-500 dark:text-zinc-400 shadow-inner">
+                          <div className="flex justify-between">
                             <span>Subtotal</span>
-                            <span className="font-bold text-foreground">₹{subtotal.toFixed(2)}</span>
+                            <span className="text-zinc-900 dark:text-white font-mono font-black">₹{subtotal.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
-                            <span>GST (5% tax)</span>
-                            <span className="font-bold text-foreground">₹{taxAmount.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs font-black text-foreground pt-1.5 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
-                            <span className="uppercase tracking-wider">Grand Total Amount</span>
-                            <span className="text-sm font-black text-indigo-500">₹{grandTotal.toFixed(2)}</span>
+                          {discountAmount > 0 && (
+                            <div className="flex justify-between text-rose-500 font-extrabold">
+                              <span>Discount ({discountPercent}%)</span>
+                              <span className="font-mono font-black">-₹{discountAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {taxAmount > 0 && (
+                            <div className="flex justify-between">
+                              <span>GST ({taxPercent}%)</span>
+                              <span className="text-zinc-900 dark:text-white font-mono font-black">₹{taxAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {vatAmount > 0 && (
+                            <div className="flex justify-between">
+                              <span>VAT ({vatPercent}%)</span>
+                              <span className="text-zinc-900 dark:text-white font-mono font-black">₹{vatAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between text-xs font-black text-zinc-900 dark:text-white pt-2.5 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-1">
+                            <span className="uppercase tracking-widest text-[9.5px]">Amount to Pay</span>
+                            <span className="text-base font-black text-indigo-650 font-mono">₹{grandTotal.toFixed(2)}</span>
                           </div>
                         </div>
 
@@ -640,7 +757,7 @@ export default function AdminTablesPage() {
                       
                       <div className="space-y-2">
                         <button
-                          onClick={() => updateTableStatus(selectedTable.id, 'available')}
+                          onClick={() => triggerUpdateTableStatus('available')}
                           className={`flex w-full items-center gap-3 p-3 rounded-xl border text-left active:scale-[0.98] transition-all cursor-pointer ${
                             selectedTable.status === 'available'
                               ? 'border-green-500/35 bg-green-500/5 text-green-700 dark:text-green-400 font-bold'
@@ -655,7 +772,7 @@ export default function AdminTablesPage() {
                         </button>
 
                         <button
-                          onClick={() => updateTableStatus(selectedTable.id, 'occupied')}
+                          onClick={() => triggerUpdateTableStatus('occupied')}
                           className={`flex w-full items-center gap-3 p-3 rounded-xl border text-left active:scale-[0.98] transition-all cursor-pointer ${
                             selectedTable.status === 'occupied'
                               ? 'border-amber-500/35 bg-amber-500/5 text-amber-700 dark:text-amber-400 font-bold'
@@ -670,7 +787,7 @@ export default function AdminTablesPage() {
                         </button>
 
                         <button
-                          onClick={() => updateTableStatus(selectedTable.id, 'billing')}
+                          onClick={() => triggerUpdateTableStatus('billing')}
                           className={`flex w-full items-center gap-3 p-3 rounded-xl border text-left active:scale-[0.98] transition-all cursor-pointer ${
                             selectedTable.status === 'billing'
                               ? 'border-blue-500/35 bg-blue-500/5 text-blue-700 dark:text-blue-400 font-bold'
@@ -705,30 +822,25 @@ export default function AdminTablesPage() {
                   {activeOrders.length > 0 && (
                     <>
                       <button
-                        onClick={() => printBill(false)}
+                        onClick={triggerPrintBill}
                         disabled={submittingPayment || fetchingOrders}
-                        className="flex-1 py-2.5 rounded-xl border border-zinc-250 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold cursor-pointer select-none disabled:opacity-50 flex items-center justify-center gap-1.5"
-                        title="Print estimate bill"
+                        className="flex-1 py-2.5 rounded-xl border border-zinc-250 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold cursor-pointer select-none disabled:opacity-50 flex items-center justify-center gap-1.5 text-center"
                       >
-                        <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-                        Estimate
+                        Print Bill
                       </button>
 
                       <button
-                        onClick={handleCheckout}
+                        onClick={triggerClearTable}
                         disabled={submittingPayment || fetchingOrders}
-                        className="flex-[2] py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50"
+                        className="flex-[2] py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50 text-center"
                       >
                         {submittingPayment ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            Finalizing...
+                            <Loader2 className="w-4 h-4 animate-spin text-white animate-pulse" />
+                            Clearing Table...
                           </>
                         ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                            Pay & Clear
-                          </>
+                          'Clear Table'
                         )}
                       </button>
                     </>
@@ -744,6 +856,44 @@ export default function AdminTablesPage() {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Overlay */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300" 
+            onClick={() => setConfirmDialog(null)} 
+          />
+          <div className="relative z-10 w-full max-w-xs bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col text-center space-y-4">
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold leading-normal">
+                {confirmDialog.description}
+              </p>
+            </div>
+            <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-black text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.cancelText || 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  const cb = confirmDialog.onConfirm
+                  setConfirmDialog(null)
+                  await cb()
+                }}
+                className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.confirmText}
+              </button>
+            </div>
           </div>
         </div>
       )}

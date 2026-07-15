@@ -78,6 +78,7 @@ function OrderPageContent() {
   
   // Custom Taxes and Discounts on Cart
   const [taxPercent, setTaxPercent] = useState<number>(5) // Default 5%
+  const [vatPercent, setVatPercent] = useState<number>(0) // Default 0%
   const [discountPercent, setDiscountPercent] = useState<number>(0) // Default 0%
   
   // UI States
@@ -89,6 +90,27 @@ function OrderPageContent() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(25)
+
+  // --- Confirmation Dialog State ---
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    cancelText?: string
+    onConfirm: () => void | Promise<void>
+  } | null>(null)
+
+  const triggerSendKOT = () => {
+    if (cart.length === 0) return
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Send KOT to Kitchen?',
+      description: `Send order of ${cart.reduce((s, c) => s + c.quantity, 0)} items to kitchen printers for Table ${table?.number}?`,
+      confirmText: 'Yes, Send KOT',
+      onConfirm: handlePlaceOrder
+    })
+  }
 
   // Fetch initial details: Table, Categories, Menu Items
   const fetchData = async (forceSeed = false) => {
@@ -357,7 +379,8 @@ function OrderPageContent() {
   const discountAmount = cartSubtotal * (discountPercent / 100)
   const taxableAmount = Math.max(0, cartSubtotal - discountAmount)
   const cartTax = taxableAmount * (taxPercent / 100)
-  const cartTotal = taxableAmount + cartTax
+  const cartVat = taxableAmount * (vatPercent / 100)
+  const cartTotal = taxableAmount + cartTax + cartVat
   const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   // Map category ID to sets of printer types based on menu items
@@ -994,14 +1017,14 @@ function OrderPageContent() {
                   <span>Configure Cart Tax & Discounts</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   {/* Discount Select */}
                   <div className="space-y-1">
                     <label className="text-[9.5px] font-bold text-muted-foreground">Discount</label>
                     <select 
                       value={discountPercent} 
                       onChange={(e) => setDiscountPercent(Number(e.target.value))}
-                      className="w-full bg-background border border-zinc-250 dark:border-zinc-800 rounded-xl px-2 py-1.5 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-amber-500"
+                      className="w-full bg-background border border-zinc-250 dark:border-zinc-800 rounded-xl px-1.5 py-1.5 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-amber-500"
                     >
                       {[0, 5, 10, 15, 20].map(val => (
                         <option key={val} value={val}>{val}% off</option>
@@ -1015,10 +1038,24 @@ function OrderPageContent() {
                     <select 
                       value={taxPercent} 
                       onChange={(e) => setTaxPercent(Number(e.target.value))}
-                      className="w-full bg-background border border-zinc-250 dark:border-zinc-800 rounded-xl px-2 py-1.5 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-amber-500"
+                      className="w-full bg-background border border-zinc-250 dark:border-zinc-800 rounded-xl px-1.5 py-1.5 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-amber-500"
                     >
                       {[0, 5, 12, 18, 28].map(val => (
                         <option key={val} value={val}>{val}% GST</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* VAT Select */}
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] font-bold text-muted-foreground">VAT</label>
+                    <select 
+                      value={vatPercent} 
+                      onChange={(e) => setVatPercent(Number(e.target.value))}
+                      className="w-full bg-background border border-zinc-250 dark:border-zinc-800 rounded-xl px-1.5 py-1.5 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-amber-500"
+                    >
+                      {[0, 5, 10, 14.5, 20].map(val => (
+                        <option key={val} value={val}>{val}% VAT</option>
                       ))}
                     </select>
                   </div>
@@ -1042,6 +1079,10 @@ function OrderPageContent() {
                 <span>GST ({taxPercent}%)</span>
                 <span className="font-bold text-foreground">₹{cartTax.toFixed(2)}</span>
               </div>
+              <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                <span>VAT ({vatPercent}%)</span>
+                <span className="font-bold text-foreground">₹{cartVat.toFixed(2)}</span>
+              </div>
               
               <div className="flex justify-between text-xs font-black text-foreground pt-1.5 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
                 <span className="uppercase tracking-wider">Total Bill Amount</span>
@@ -1060,7 +1101,7 @@ function OrderPageContent() {
               </button>
 
               <button
-                onClick={handlePlaceOrder}
+                onClick={triggerSendKOT}
                 disabled={submitting || cart.length === 0}
                 className="flex-[2] py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50"
               >
@@ -1091,6 +1132,44 @@ function OrderPageContent() {
             <p className="text-xs text-muted-foreground font-semibold max-w-xs px-6">
               Order has been created successfully. Redirecting you to tables dashboard...
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Overlay */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300" 
+            onClick={() => setConfirmDialog(null)} 
+          />
+          <div className="relative z-10 w-full max-w-xs bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col text-center space-y-4">
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold leading-normal">
+                {confirmDialog.description}
+              </p>
+            </div>
+            <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-black text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-850 active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.cancelText || 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  const cb = confirmDialog.onConfirm
+                  setConfirmDialog(null)
+                  await cb()
+                }}
+                className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.confirmText}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -77,6 +77,7 @@ export default function TablesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [taxPercent, setTaxPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(0)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [serviceChargePercent, setServiceChargePercent] = useState<number>(0)
 
@@ -95,6 +96,62 @@ export default function TablesPage() {
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
   const [submittingOrder, setSubmittingOrder] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
+
+  // --- Confirmation Dialog State ---
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    cancelText?: string
+    onConfirm: () => void | Promise<void>
+  } | null>(null)
+
+  const triggerSendKOT = () => {
+    if (cart.length === 0) return
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Send KOT to Kitchen?',
+      description: `Send order of ${cart.reduce((s, c) => s + c.quantity, 0)} items to kitchen printers for Table ${selectedTable?.number}?`,
+      confirmText: 'Yes, Send KOT',
+      onConfirm: handlePlaceOrder
+    })
+  }
+
+  const triggerPrintBill = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Print Bill Ticket?',
+      description: `Request print server to print receipt invoice for Table ${selectedTable?.number}?`,
+      confirmText: 'Yes, Print',
+      onConfirm: () => printBill(false)
+    })
+  }
+
+  const triggerClearTable = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Clear Table & Settle?',
+      description: `Process settlement and clear Table ${selectedTable?.number}? Active running orders will be finalized.`,
+      confirmText: 'Yes, Settle & Clear',
+      onConfirm: handleCheckout
+    })
+  }
+
+  const triggerUpdateTableStatus = (status: 'available' | 'occupied' | 'billing') => {
+    const statusLabels = {
+      available: 'Available',
+      occupied: 'Occupied',
+      billing: 'Billing'
+    }
+    setConfirmDialog({
+      isOpen: true,
+      title: `Change Status to ${statusLabels[status]}?`,
+      description: `Mark Table ${selectedTable?.number} status as ${statusLabels[status]}?`,
+      confirmText: `Mark ${statusLabels[status]}`,
+      onConfirm: () => updateTableStatus(selectedTable!.id, status)
+    })
+  }
 
   // --- Lock background scroll when modal/drawer/menu is open ---
   useEffect(() => {
@@ -406,7 +463,15 @@ export default function TablesPage() {
         .eq('id', tableId)
       if (uErr) throw uErr
     } catch (err: any) {
-      console.error('Table status error:', err)
+      console.error('Table status error:', err?.message || err)
+      if (err && typeof err === 'object') {
+        console.error('Table status error details:', {
+          code: err.code,
+          message: err.message,
+          details: err.details,
+          hint: err.hint
+        })
+      }
       fetchTables()
     } finally {
       setUpdatingTableId(null)
@@ -741,6 +806,8 @@ export default function TablesPage() {
         subtotal,
         taxPercent,
         taxAmount,
+        vatPercent,
+        vatAmount,
         discountPercent,
         discountAmount,
         serviceChargePercent,
@@ -822,7 +889,6 @@ export default function TablesPage() {
         status: 'completed'
       })
 
-      await printBill(true, primaryOrderId)
       await updateTableStatus(selectedTable.id, 'available')
       setSelectedTable(null)
     } catch (e: any) {
@@ -841,6 +907,7 @@ export default function TablesPage() {
       setActiveOrders(runningOrders)
       setBillingMode(false)
       setTaxPercent(5)
+      setVatPercent(0)
       setDiscountPercent(0)
       setServiceChargePercent(0)
       fetchActiveOrders(selectedTable.id)
@@ -872,8 +939,9 @@ export default function TablesPage() {
   const discountAmount = subtotal * (discountPercent / 100)
   const taxableAmount = Math.max(0, subtotal - discountAmount)
   const taxAmount = taxableAmount * (taxPercent / 100)
+  const vatAmount = taxableAmount * (vatPercent / 100)
   const serviceChargeAmount = subtotal * (serviceChargePercent / 100)
-  const grandTotal = taxableAmount + taxAmount + serviceChargeAmount
+  const grandTotal = taxableAmount + taxAmount + vatAmount + serviceChargeAmount
 
   const getTableOccupiedDuration = (t: Table) => {
     const list = t.orders?.filter(o => o.status !== 'cancelled' && o.status !== 'served') || []
@@ -1003,19 +1071,19 @@ export default function TablesPage() {
             {tables.map((table) => {
               const themeConfig = {
                 available: {
-                  border: 'border-zinc-200/60 dark:border-zinc-900 bg-white hover:bg-zinc-50/50',
+                  border: 'border-zinc-200/60 dark:border-zinc-900 bg-white dark:bg-zinc-900/40 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/60',
                   badge: 'bg-green-500',
                   statusColor: 'text-green-600 dark:text-green-400',
                   iconColor: 'text-green-500/20'
                 },
                 occupied: {
-                  border: 'border-orange-500/20 bg-orange-500/[0.02] hover:bg-orange-500/[0.04]',
+                  border: 'border-orange-500/20 dark:border-orange-500/35 bg-orange-500/[0.02] dark:bg-orange-500/[0.05] hover:bg-orange-500/[0.04] dark:hover:bg-orange-500/[0.08]',
                   badge: 'bg-orange-500',
                   statusColor: 'text-orange-600 dark:text-orange-400',
                   iconColor: 'text-orange-500/25'
                 },
                 billing: {
-                  border: 'border-blue-500/25 bg-blue-500/[0.02] hover:bg-blue-500/[0.04]',
+                  border: 'border-blue-500/25 dark:border-blue-500/35 bg-blue-500/[0.02] dark:bg-blue-500/[0.05] hover:bg-blue-500/[0.04] dark:hover:bg-blue-500/[0.08]',
                   badge: 'bg-blue-500',
                   statusColor: 'text-blue-600 dark:text-blue-400',
                   iconColor: 'text-blue-500/25'
@@ -1247,7 +1315,7 @@ export default function TablesPage() {
               </button>
 
               <button
-                onClick={handlePlaceOrder}
+                onClick={triggerSendKOT}
                 disabled={submittingOrder}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] px-5 py-2.5 rounded-xl flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
               >
@@ -1351,7 +1419,7 @@ export default function TablesPage() {
               </div>
               <button 
                 onClick={() => setSelectedTable(null)} 
-                className="p-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-650 hover:bg-zinc-50 dark:hover:bg-zinc-955/50"
+                className="p-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 dark:hover:text-white dark:hover:bg-zinc-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1360,7 +1428,6 @@ export default function TablesPage() {
             {/* Pane Content */}
             <div className="flex-1 overflow-y-auto py-3 space-y-4 pr-0.5 scrollbar-none">
               {billingMode ? (
-                /* CHECKOUT PANE */
                 <div className="space-y-4.5">
                   {fetchingOrders ? (
                     <div className="py-12 flex flex-col items-center justify-center space-y-3">
@@ -1371,85 +1438,127 @@ export default function TablesPage() {
                     <div className="py-10 text-center text-xs text-zinc-400 font-black">No active KOT orders found.</div>
                   ) : (
                     <>
+                      {/* Summary Header */}
+                      <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1.5 shrink-0">
+                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Order Summary</span>
+                        <span className="text-[9px] font-bold text-zinc-400">{aggregatedItems.length} items</span>
+                      </div>
+
                       {/* Items list with quantity modifiers */}
-                      <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-none pr-1">
+                      <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-none pr-1">
                         {aggregatedItems.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-3 rounded-2xl border border-zinc-100 dark:border-zinc-850 text-[10px] font-bold bg-zinc-50/30 dark:bg-zinc-950/30">
-                            <span className="text-zinc-900 dark:text-white font-extrabold truncate max-w-[170px]">{item.name}</span>
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl h-6 px-1">
-                                <button onClick={() => handleUpdateItemQuantity(item.name, item.quantity, -1)} className="w-5"><Minus className="w-2.5 h-2.5 mx-auto" /></button>
-                                <span className="w-4 text-center text-[9px] font-black font-mono">{item.quantity}</span>
-                                <button onClick={() => handleUpdateItemQuantity(item.name, item.quantity, 1)} className="w-5"><Plus className="w-2.5 h-2.5 mx-auto" /></button>
+                          <div key={idx} className="flex justify-between items-center text-[10.5px] font-bold text-zinc-800 dark:text-zinc-200">
+                            <div className="flex flex-col min-w-0">
+                              <span className="truncate font-extrabold text-foreground">{item.name}</span>
+                              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-medium">₹{item.price.toFixed(0)} each</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center bg-zinc-150/50 dark:bg-zinc-800 rounded-xl h-6 p-0.5 border border-zinc-200/50 dark:border-zinc-800/80">
+                                <button 
+                                  onClick={() => handleUpdateItemQuantity(item.name, item.quantity, -1)}
+                                  className="w-5 text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-200 transition-colors"
+                                >
+                                  <Minus className="w-2.5 h-2.5 mx-auto" />
+                                </button>
+                                <span className="w-4 text-center text-[9px] font-black text-foreground">{item.quantity}</span>
+                                <button 
+                                  onClick={() => handleUpdateItemQuantity(item.name, item.quantity, 1)}
+                                  className="w-5 text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-200 transition-colors"
+                                >
+                                  <Plus className="w-2.5 h-2.5 mx-auto" />
+                                </button>
                               </div>
-                              <span className="w-14 text-right text-zinc-900 dark:text-white font-black font-mono">₹{(item.price * item.quantity).toFixed(0)}</span>
+                              <span className="w-14 text-right font-black font-mono text-foreground">₹{(item.price * item.quantity).toFixed(0)}</span>
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      {/* iOS Segmented Pickers for Tax / Discount */}
-                      <div className="p-3.5 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-3">
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-[9px] font-black text-zinc-400 uppercase tracking-wider">
-                            <span>Discount Percentage</span>
-                            <span className="text-zinc-900 dark:text-white font-mono">₹{discountAmount.toFixed(0)} ({discountPercent}%)</span>
-                          </div>
-                          <div className="grid grid-cols-5 gap-1 p-0.5 bg-zinc-200/50 dark:bg-zinc-955/55 rounded-xl">
-                            {[0, 5, 10, 15, 20].map((val) => (
-                              <button
-                                key={val}
-                                onClick={() => setDiscountPercent(val)}
-                                className={`py-1 text-[9px] font-black rounded-lg transition-all ${
-                                  discountPercent === val 
-                                    ? 'bg-white text-zinc-955 dark:bg-zinc-800 dark:text-white shadow-xs' 
-                                    : 'text-zinc-500 hover:text-zinc-700'
-                                  }`}
-                              >
-                                {val}%
-                              </button>
+                      {/* Cart Adjustments Dropdowns (Minimalist side-by-side row) */}
+                      <div className="grid grid-cols-3 gap-2 bg-zinc-50/50 dark:bg-zinc-900/40 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-850">
+                        {/* Discount */}
+                        <div className="space-y-0.5">
+                          <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">Discount</span>
+                          <select
+                            value={discountPercent}
+                            onChange={(e) => setDiscountPercent(Number(e.target.value))}
+                            className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                          >
+                            {[0, 5, 10, 15, 20].map(val => (
+                              <option key={val} value={val}>{val}% Off</option>
                             ))}
-                          </div>
+                          </select>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-[9px] font-black text-zinc-400 uppercase tracking-wider">
-                            <span>GST Tax Percentage</span>
-                            <span className="text-zinc-900 dark:text-white font-mono">₹{taxAmount.toFixed(0)} ({taxPercent}%)</span>
-                          </div>
-                          <div className="grid grid-cols-5 gap-1 p-0.5 bg-zinc-200/50 dark:bg-zinc-955/55 rounded-xl">
-                            {[0, 5, 12, 18, 28].map((val) => (
-                              <button
-                                key={val}
-                                onClick={() => setTaxPercent(val)}
-                                className={`py-1 text-[9px] font-black rounded-lg transition-all ${
-                                  taxPercent === val 
-                                    ? 'bg-white text-zinc-955 dark:bg-zinc-800 dark:text-white shadow-xs' 
-                                    : 'text-zinc-500 hover:text-zinc-700'
-                                  }`}
-                              >
-                                {val}%
-                              </button>
+                        {/* GST */}
+                        <div className="space-y-0.5">
+                          <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">GST Tax</span>
+                          <select
+                            value={taxPercent}
+                            onChange={(e) => setTaxPercent(Number(e.target.value))}
+                            className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                          >
+                            {[0, 5, 12, 18, 28].map(val => (
+                              <option key={val} value={val}>{val}% GST</option>
                             ))}
-                          </div>
+                          </select>
+                        </div>
+
+                        {/* VAT */}
+                        <div className="space-y-0.5">
+                          <span className="text-[8.5px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">VAT</span>
+                          <select
+                            value={vatPercent}
+                            onChange={(e) => setVatPercent(Number(e.target.value))}
+                            className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10.5px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                          >
+                            {[0, 5, 10, 14.5, 20].map(val => (
+                              <option key={val} value={val}>{val}% VAT</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 
-                      {/* Checkout Computations */}
-                      <div className="border-t border-zinc-100 dark:border-zinc-850 pt-3 space-y-1.5 text-[10px] font-bold text-zinc-400">
-                        <div className="flex justify-between"><span>Subtotal</span><span className="text-zinc-900 dark:text-white font-mono">₹{subtotal.toFixed(2)}</span></div>
-                        {discountAmount > 0 && <div className="flex justify-between text-rose-500"><span>Discounted Amount</span><span className="font-mono">-₹{discountAmount.toFixed(2)}</span></div>}
-                        <div className="flex justify-between"><span>GST Tax Charges</span><span className="text-zinc-900 dark:text-white font-mono">₹{taxAmount.toFixed(2)}</span></div>
+                      {/* Checkout Computations (Sleek receipt-card style) */}
+                      <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-850/80 space-y-2 text-[10.5px] font-bold text-zinc-500 dark:text-zinc-400 shadow-inner">
+                        <div className="flex justify-between">
+                          <span>Subtotal</span>
+                          <span className="text-zinc-900 dark:text-white font-mono font-black">₹{subtotal.toFixed(2)}</span>
+                        </div>
+                        {discountAmount > 0 && (
+                          <div className="flex justify-between text-rose-500 font-extrabold">
+                            <span>Discount ({discountPercent}%)</span>
+                            <span className="font-mono font-black">-₹{discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {taxAmount > 0 && (
+                          <div className="flex justify-between">
+                            <span>GST ({taxPercent}%)</span>
+                            <span className="text-zinc-900 dark:text-white font-mono font-black">₹{taxAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {vatAmount > 0 && (
+                          <div className="flex justify-between">
+                            <span>VAT ({vatPercent}%)</span>
+                            <span className="text-zinc-900 dark:text-white font-mono font-black">₹{vatAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {serviceChargePercent > 0 && (
+                          <div className="flex justify-between">
+                            <span>Service Charge ({serviceChargePercent}%)</span>
+                            <span className="text-zinc-900 dark:text-white font-mono font-black">₹{serviceChargeAmount.toFixed(2)}</span>
+                          </div>
+                        )}
                         
-                        <div className="flex justify-between text-xs font-black text-zinc-900 dark:text-white pt-2 border-t border-dashed border-zinc-150 dark:border-zinc-800">
-                          <span className="uppercase tracking-widest text-[9.5px]">Grand Invoice Total</span>
-                          <span className="text-sm font-black text-orange-500 font-mono">₹{grandTotal.toFixed(2)}</span>
+                        <div className="flex justify-between text-xs font-black text-zinc-900 dark:text-white pt-2.5 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-1">
+                          <span className="uppercase tracking-widest text-[9.5px]">Amount to Pay</span>
+                          <span className="text-base font-black text-orange-550 font-mono">₹{grandTotal.toFixed(2)}</span>
                         </div>
                       </div>
 
                       {/* Payment Method */}
-                      <div className="space-y-2">
-                        <span className="text-[8.5px] font-black text-zinc-400 uppercase tracking-widest block px-1">Settlement Method</span>
+                      <div className="space-y-1.5">
+                        <span className="text-[8.5px] font-black text-zinc-400 uppercase tracking-widest block px-0.5">Settlement Method</span>
                         <div className="grid grid-cols-3 gap-2">
                           {(['upi', 'cash', 'card'] as const).map(method => (
                             <button
@@ -1458,7 +1567,7 @@ export default function TablesPage() {
                               className={`py-2 rounded-xl text-[10px] font-black border transition-all active:scale-95 cursor-pointer ${
                                 paymentMethod === method 
                                   ? 'bg-zinc-950 text-white border-transparent dark:bg-white dark:text-zinc-950 shadow-sm' 
-                                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-500'
+                                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900'
                               }`}
                             >
                               {method === 'upi' ? '📱 UPI' : method === 'cash' ? '💵 Cash' : '💳 Card'}
@@ -1511,7 +1620,7 @@ export default function TablesPage() {
                       return (
                         <button
                           key={statusItem.id}
-                          onClick={() => updateTableStatus(selectedTable.id, statusItem.id as any)}
+                          onClick={() => triggerUpdateTableStatus(statusItem.id as any)}
                           className={`flex items-center justify-between p-3 border rounded-2xl text-left active:scale-[0.97] transition-all cursor-pointer ${
                             isMatch ? textColors : 'border-zinc-200/60 dark:border-zinc-800 bg-background hover:bg-zinc-50'
                           }`}
@@ -1539,25 +1648,25 @@ export default function TablesPage() {
                   <button
                     onClick={() => setBillingMode(false)}
                     disabled={submittingPayment}
-                    className="flex-1 py-3 border border-zinc-200 dark:border-zinc-855 rounded-2xl text-xs font-bold hover:bg-zinc-50 cursor-pointer disabled:opacity-50 active:scale-95 transition-all"
+                    className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl text-xs font-bold cursor-pointer disabled:opacity-50 active:scale-95 transition-all"
                   >
                     Back
                   </button>
                   {activeOrders.length > 0 && (
                     <>
                       <button
-                        onClick={() => printBill(false)}
+                        onClick={triggerPrintBill}
                         disabled={submittingPayment || fetchingOrders}
-                        className="flex-1 py-3 border border-zinc-200 dark:border-zinc-855 rounded-2xl text-xs font-bold hover:bg-zinc-50 cursor-pointer disabled:opacity-50 active:scale-95 transition-all"
+                        className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl text-xs font-bold cursor-pointer disabled:opacity-50 active:scale-95 transition-all text-center"
                       >
-                        Print Estimate
+                        Print Bill
                       </button>
                       <button
-                        onClick={handleCheckout}
+                        onClick={triggerClearTable}
                         disabled={submittingPayment || fetchingOrders}
-                        className="flex-[2] py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-50"
+                        className="flex-[2] py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-50 text-center"
                       >
-                        {submittingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Pay & Clear Table'}
+                        {submittingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Clear Table'}
                       </button>
                     </>
                   )}
@@ -1565,13 +1674,51 @@ export default function TablesPage() {
               ) : (
                 <button
                   onClick={() => setSelectedTable(null)}
-                  className="w-full py-3.5 border border-zinc-200 dark:border-zinc-855 rounded-2xl text-xs font-bold hover:bg-zinc-50 active:scale-[0.97] transition-all cursor-pointer"
+                  className="w-full py-3.5 border border-zinc-200 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl text-xs font-bold active:scale-[0.97] transition-all cursor-pointer"
                 >
                   Close Panel
                 </button>
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Overlay */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
+          <div 
+            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300" 
+            onClick={() => setConfirmDialog(null)} 
+          />
+          <div className="relative z-10 w-full max-w-xs bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col text-center space-y-4">
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+              <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold leading-normal">
+                {confirmDialog.description}
+              </p>
+            </div>
+            <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px] font-black text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.cancelText || 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  const cb = confirmDialog.onConfirm
+                  setConfirmDialog(null)
+                  await cb()
+                }}
+                className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black active:scale-95 transition-all cursor-pointer"
+              >
+                {confirmDialog.confirmText}
+              </button>
+            </div>
           </div>
         </div>
       )}
