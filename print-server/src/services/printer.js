@@ -78,61 +78,70 @@ export const printerService = {
       removeSpecialCharacters: false
     });
 
-    try {
-      // 1. Clear printer buffer
-      printer.clear();
+    return new Promise(async (resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Printing operation timed out (12000ms). Verify printer is powered on, connected to the network/host, and the IP/UNC share path '${connectionUri}' is correct.`));
+      }, 12000);
 
-      // 2. Format print document based on job type
-      const jobType = (payload.type || "KOT").toUpperCase();
-      if (jobType === "KOT") {
-        renderKOT(printer, payload);
-      } else if (jobType === "BILL" || jobType === "INVOICE") {
-        renderBill(printer, payload);
-      } else {
-        renderGeneric(printer, payload);
-      }
+      try {
+        // 1. Clear printer buffer
+        printer.clear();
 
-      // 3. Cut Paper
-      printer.cut();
-
-      // 4. Execute printing
-      if (connectionUri.startsWith("\\\\") || connectionUri.startsWith("//")) {
-        // For USB shared printers on Windows, write the buffer to a temp file and copy it to the printer share path
-        const buffer = printer.getBuffer();
-        const tempFilePath = path.join(process.cwd(), `temp_print_${Date.now()}.bin`);
-        
-        await fs.promises.writeFile(tempFilePath, buffer);
-        
-        await new Promise((resolve, reject) => {
-          // Normalize backslashes for Windows copy command
-          const normalizedPath = connectionUri.replace(/\//g, "\\");
-          exec(`copy /B "${tempFilePath}" "${normalizedPath}"`, (error, stdout, stderr) => {
-            if (error) {
-              logger.error(`Shell copy to printer failed: ${stderr || error.message}`);
-              reject(new Error(stderr || error.message));
-            } else {
-              logger.info(`Shell copy stdout: ${stdout.trim()}`);
-              resolve();
-            }
-          });
-        });
-        
-        // Clean up temp file
-        try {
-          await fs.promises.unlink(tempFilePath);
-        } catch (e) {
-          logger.warn(`Failed to clean up temp file ${tempFilePath}: ${e.message}`);
+        // 2. Format print document based on job type
+        const jobType = (payload.type || "KOT").toUpperCase();
+        if (jobType === "KOT") {
+          renderKOT(printer, payload);
+        } else if (jobType === "BILL" || jobType === "INVOICE") {
+          renderBill(printer, payload);
+        } else {
+          renderGeneric(printer, payload);
         }
-      } else {
-        // Standard TCP print execute
-        await printer.execute();
+
+        // 3. Cut Paper
+        printer.cut();
+
+        // 4. Execute printing
+        if (connectionUri.startsWith("\\\\") || connectionUri.startsWith("//")) {
+          // For USB shared printers on Windows, write the buffer to a temp file and copy it to the printer share path
+          const buffer = printer.getBuffer();
+          const tempFilePath = path.join(process.cwd(), `temp_print_${Date.now()}.bin`);
+          
+          await fs.promises.writeFile(tempFilePath, buffer);
+          
+          await new Promise((res, rej) => {
+            // Normalize backslashes for Windows copy command
+            const normalizedPath = connectionUri.replace(/\//g, "\\");
+            exec(`copy /B "${tempFilePath}" "${normalizedPath}"`, { timeout: 8000 }, (error, stdout, stderr) => {
+              if (error) {
+                logger.error(`Shell copy to printer failed: ${stderr || error.message}`);
+                rej(new Error(stderr || error.message));
+              } else {
+                logger.info(`Shell copy stdout: ${stdout.trim()}`);
+                res();
+              }
+            });
+          });
+          
+          // Clean up temp file
+          try {
+            await fs.promises.unlink(tempFilePath);
+          } catch (e) {
+            logger.warn(`Failed to clean up temp file ${tempFilePath}: ${e.message}`);
+          }
+        } else {
+          // Standard TCP print execute
+          await printer.execute();
+        }
+
+        logger.success(`Successfully printed job [${job.id}] on ${printerName}`);
+        clearTimeout(timeoutId);
+        resolve(true);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        logger.error(`Printing failed for job [${job.id}] on printer [${printerName}]:`, error);
+        reject(error);
       }
-      logger.success(`Successfully printed job [${job.id}] on ${printerName}`);
-      return true;
-    } catch (error) {
-      logger.error(`Printing failed for job [${job.id}] on printer [${printerName}]:`, error);
-      throw error;
-    }
+    });
   }
 };
 
@@ -224,7 +233,7 @@ function renderKOT(printer, payload) {
 
 /**
  * Render Customer Invoice / Bill
- * Focus: Professional split receipt matching DotPe format (Consolidated Statement & separate GST/VAT Invoices).
+ * Focus: Professional consolidated receipt in a single invoice page.
  */
 function renderBill(printer, payload) {
   let {
@@ -259,9 +268,6 @@ function renderBill(printer, payload) {
   const gstItems = items.filter(item => (item.printer_type || "kitchen").toLowerCase() !== "bar");
   const vatItems = items.filter(item => (item.printer_type || "").toLowerCase() === "bar");
 
-  const hasGst = gstItems.length > 0;
-  const hasVat = vatItems.length > 0;
-
   // Helper functions for formatting
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const formatDateTime = (isoString) => {
@@ -271,8 +277,6 @@ function renderBill(printer, payload) {
     const y = date.getFullYear();
     let hrs = date.getHours();
     const mins = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hrs >= 12 ? 'AM' : 'AM'; // Match AM/PM correctly
-    const displayAmpm = hrs >= 12 ? 'AM' : 'AM'; // For mock consistency if preferred, let's keep real AM/PM
     const actualAmpm = hrs >= 12 ? 'PM' : 'AM';
     hrs = hrs % 12;
     hrs = hrs ? hrs : 12;
@@ -282,24 +286,27 @@ function renderBill(printer, payload) {
 
   const formattedDateTime = formatDateTime(timestamp);
 
-  // Calculate values for GST group
+  // Calculate values
+  const totalSubtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalDiscount = totalSubtotal * (discountPercent / 100);
+
+  // GST portion calculations
   const gstSubtotal = gstItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const gstDiscount = gstSubtotal * (discountPercent / 100);
   const gstTaxable = Math.max(0, gstSubtotal - gstDiscount);
   const cgstAmount = gstTaxable * (taxPercent / 2 / 100);
   const sgstAmount = gstTaxable * (taxPercent / 2 / 100);
-  const gstServiceCharge = gstSubtotal * (serviceChargePercent / 100);
-  const gstTotal = gstTaxable + cgstAmount + sgstAmount + gstServiceCharge;
 
-  // Calculate values for VAT group
+  // VAT portion calculations
   const vatSubtotal = vatItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const vatDiscount = vatSubtotal * (discountPercent / 100);
   const vatTaxable = Math.max(0, vatSubtotal - vatDiscount);
   const vatAmountCalculated = vatTaxable * (vatPercent / 100);
-  const vatServiceCharge = vatSubtotal * (serviceChargePercent / 100);
-  const vatTotal = vatTaxable + vatAmountCalculated + vatServiceCharge;
 
-  const totalBeforeRounding = (hasGst ? gstTotal : 0) + (hasVat ? vatTotal : 0);
+  // Service Charge calculation (on overall subtotal)
+  const totalServiceCharge = totalSubtotal * (serviceChargePercent / 100);
+
+  const totalBeforeRounding = totalSubtotal - totalDiscount + cgstAmount + sgstAmount + vatAmountCalculated + totalServiceCharge;
   const totalRounded = Math.round(totalBeforeRounding);
 
   const drawCustomLine = () => {
@@ -320,188 +327,100 @@ function renderBill(printer, payload) {
     }
   };
 
-  // Helper to print a single invoice section
-  const printInvoiceSection = (title, secItems, secSubtotal, secDiscount, secServiceCharge, isGstSec, isVatSec, secTotal) => {
-    printer.alignCenter();
-    printer.printBoldTrue();
-    printer.println(title);
-    printer.printBoldFalse();
-    printer.newLine();
+  // Header / Title
+  printer.alignCenter();
+  printer.printBoldTrue();
+  printer.println("Order (Invoice)");
+  printer.printBoldFalse();
+  printer.newLine();
 
-    // Table / Pax
-    printer.setTextDoubleHeight();
-    printer.setTextDoubleWidth();
-    printer.printBoldTrue();
-    const paxStr = capacity ? ` (Pax - ${capacity})` : '';
-    printer.println(`${tableName === 'Table' ? 'H' : tableName}${tableNumber}${paxStr}`);
-    printer.setTextNormal();
-    printer.printBoldFalse();
-    printer.newLine();
+  // Table / Pax
+  printer.setTextDoubleHeight();
+  printer.setTextDoubleWidth();
+  printer.printBoldTrue();
+  const paxStr = capacity ? ` (Pax - ${capacity})` : '';
+  printer.println(`${tableName === 'Table' ? 'H' : tableName}${tableNumber}${paxStr}`);
+  printer.setTextNormal();
+  printer.printBoldFalse();
+  printer.newLine();
 
-    // Metadata
-    printer.alignLeft();
-    const totalSecQty = secItems.reduce((sum, item) => sum + item.quantity, 0);
-    const invoiceNoSuffix = isGstSec ? "-A" : isVatSec ? "-B" : "";
-    const displayInvoiceNo = invoiceNumber ? `${invoiceNumber}${invoiceNoSuffix}` : "";
-    
-    printer.println(
-      padRight(`Order ${displayInvoiceNo}`, 24) + 
-      padLeft(`${secItems.length} ${secItems.length === 1 ? 'item' : 'items'} (${totalSecQty} Qty)`, 24)
-    );
-    printer.println(
-      padRight(formattedDateTime, 24) + 
-      padLeft(captainName, 24)
-    );
-    drawCustomLine();
+  // Metadata
+  printer.alignLeft();
+  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+  printer.println(
+    padRight(`Order ${invoiceNumber}`, 24) + 
+    padLeft(`${items.length} ${items.length === 1 ? 'item' : 'items'} (${totalQty} Qty)`, 24)
+  );
+  printer.println(
+    padRight(formattedDateTime, 24) + 
+    padLeft(captainName, 24)
+  );
+  drawCustomLine();
 
-    // Table Header
-    printer.printBoldTrue();
-    printer.println(
-      padRight("Name", 26) + 
-      padLeft("Qty", 5) + 
-      padLeft("Rate", 7) + 
-      padLeft("Amount", 10)
-    );
-    printer.printBoldFalse();
-    drawCustomLine();
+  // Table Header
+  printer.printBoldTrue();
+  printer.println(
+    padRight("Name", 26) + 
+    padLeft("Qty", 5) + 
+    padLeft("Rate", 7) + 
+    padLeft("Amount", 10)
+  );
+  printer.printBoldFalse();
+  drawCustomLine();
 
-    // Items
-    secItems.forEach(item => {
-      const rowStr = formatInvoiceRow(item.name, item.quantity, item.price, item.quantity * item.price);
-      printer.println(rowStr);
-    });
-    drawCustomLine();
+  // Print all items in one table
+  items.forEach(item => {
+    const rowStr = formatInvoiceRow(item.name, item.quantity, item.price, item.quantity * item.price);
+    printer.println(rowStr);
+  });
+  drawCustomLine();
 
-    // Totals
-    printer.alignRight();
-    printer.println(padRight("Sub Total", 34) + padLeft(secSubtotal.toFixed(2), 14));
+  // Totals
+  printer.alignRight();
+  printer.println(padRight("Sub Total", 34) + padLeft(totalSubtotal.toFixed(2), 14));
 
-    if (secDiscount > 0) {
-      printer.println(padRight(`Discount (${discountPercent}%):`, 34) + padLeft((-secDiscount).toFixed(2), 14));
-    }
-
-    if (isGstSec) {
-      if (cgstAmount > 0) {
-        printer.println(padRight(`CGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(cgstAmount.toFixed(2), 14));
-      }
-      if (sgstAmount > 0) {
-        printer.println(padRight(`SGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(sgstAmount.toFixed(2), 14));
-      }
-    }
-
-    if (isVatSec) {
-      if (vatAmountCalculated > 0) {
-        printer.println(padRight(`VAT ${vatPercent.toFixed(1)}% on ${vatTaxable.toFixed(2)}`, 34) + padLeft(vatAmountCalculated.toFixed(2), 14));
-      }
-    }
-
-    if (secServiceCharge > 0) {
-      printer.println(padRight(`Service Charge (${serviceChargePercent}%):`, 34) + padLeft(secServiceCharge.toFixed(2), 14));
-    }
-
-    drawCustomLine();
-    printer.printBoldTrue();
-    printer.println(padRight("Bill Total", 34) + padLeft(secTotal.toFixed(2), 14));
-    printer.printBoldFalse();
-    printer.newLine();
-
-    // Footer
-    printer.alignCenter();
-    printer.printBoldTrue();
-    printer.println(restaurantName);
-    printer.printBoldFalse();
-    if (restaurantAddress) printer.println(restaurantAddress);
-    if (restaurantPhone) printer.println(restaurantPhone);
-    if (isVatSec && vattin) {
-      printer.println(`VATTIN - ${vattin}`);
-    } else if (isGstSec && gstin) {
-      printer.println(`GSTIN - ${gstin}`);
-    }
-    printer.newLine();
-  };
-
-  // CASE 1: Both GST and VAT items are present -> Print Statement followed by split invoices
-  if (hasGst && hasVat) {
-    // ---- 1. STATEMENT ----
-    printer.alignCenter();
-    printer.printBoldTrue();
-    printer.println("Statement");
-    printer.printBoldFalse();
-    printer.newLine();
-
-    printer.setTextDoubleHeight();
-    printer.setTextDoubleWidth();
-    printer.printBoldTrue();
-    const paxStr = capacity ? ` (Pax - ${capacity})` : '';
-    printer.println(`${tableName === 'Table' ? 'H' : tableName}${tableNumber}${paxStr}`);
-    printer.setTextNormal();
-    printer.printBoldFalse();
-    printer.newLine();
-
-    printer.alignLeft();
-    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
-    printer.println(
-      padRight(`Statement ${invoiceNumber}`, 24) + 
-      padLeft(`${items.length} ${items.length === 1 ? 'item' : 'items'} (${totalQty} Qty)`, 24)
-    );
-    printer.println(
-      padRight(formattedDateTime, 24) + 
-      padLeft(captainName, 24)
-    );
-    drawCustomLine();
-
-    printer.printBoldTrue();
-    printer.println(padRight("Name", 34) + padLeft("Amount", 14));
-    printer.printBoldFalse();
-    drawCustomLine();
-
-    // 1. Invoice (GST items total)
-    printer.println(padRight("1. Invoice", 34) + padLeft(gstTotal.toFixed(2), 14));
-    // 2. Invoice (VAT items total)
-    printer.println(padRight("2. Invoice", 34) + padLeft(vatTotal.toFixed(2), 14));
-    drawCustomLine();
-
-    printer.alignRight();
-    printer.println(padRight("Bill Total", 34) + padLeft(totalBeforeRounding.toFixed(2), 14));
-    printer.newLine();
-    printer.printBoldTrue();
-    printer.println(padRight("Bill Total (rounded)", 34) + padLeft(totalRounded.toFixed(2), 14));
-    printer.printBoldFalse();
-    drawCustomLine();
-
-    // Statement Footer
-    printer.alignCenter();
-    printer.println("Powered by www.dotpe.in");
-    if (gstin) {
-      printer.println(`GSTIN - ${gstin}`);
-    }
-    printer.newLine();
-
-    // Cut paper and proceed to GST invoice
-    printer.cut();
-
-    // ---- 2. GST INVOICE ----
-    printInvoiceSection("Order (Invoice)", gstItems, gstSubtotal, gstDiscount, gstServiceCharge, true, false, gstTotal);
-
-    // Cut paper and proceed to VAT invoice
-    printer.cut();
-
-    // ---- 3. VAT INVOICE ----
-    printInvoiceSection("Order (Invoice)", vatItems, vatSubtotal, vatDiscount, vatServiceCharge, false, true, vatTotal);
+  if (totalDiscount > 0) {
+    printer.println(padRight(`Discount (${discountPercent}%):`, 34) + padLeft((-totalDiscount).toFixed(2), 14));
   }
-  // CASE 2: Only GST items exist
-  else if (hasGst) {
-    printInvoiceSection("Order (Invoice)", gstItems, gstSubtotal, gstDiscount, gstServiceCharge, true, false, gstTotal);
+
+  if (cgstAmount > 0) {
+    printer.println(padRight(`CGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(cgstAmount.toFixed(2), 14));
   }
-  // CASE 3: Only VAT items exist
-  else if (hasVat) {
-    printInvoiceSection("Order (Invoice)", vatItems, vatSubtotal, vatDiscount, vatServiceCharge, false, true, vatTotal);
+  if (sgstAmount > 0) {
+    printer.println(padRight(`SGST ${(taxPercent/2).toFixed(1)}% on ${gstTaxable.toFixed(2)}`, 34) + padLeft(sgstAmount.toFixed(2), 14));
   }
-  // fallback for empty items
-  else {
-    printer.alignCenter();
-    printer.println("NO ITEMS TO PRINT");
+
+  if (vatAmountCalculated > 0) {
+    printer.println(padRight(`VAT ${vatPercent.toFixed(1)}% on ${vatTaxable.toFixed(2)}`, 34) + padLeft(vatAmountCalculated.toFixed(2), 14));
   }
+
+  if (totalServiceCharge > 0) {
+    printer.println(padRight(`Service Charge (${serviceChargePercent}%):`, 34) + padLeft(totalServiceCharge.toFixed(2), 14));
+  }
+
+  drawCustomLine();
+  printer.printBoldTrue();
+  printer.println(padRight("Bill Total", 34) + padLeft(totalBeforeRounding.toFixed(2), 14));
+  printer.newLine();
+  printer.println(padRight("Bill Total (rounded)", 34) + padLeft(totalRounded.toFixed(2), 14));
+  printer.printBoldFalse();
+  drawCustomLine();
+
+  // Footer
+  printer.alignCenter();
+  printer.printBoldTrue();
+  printer.println(restaurantName);
+  printer.printBoldFalse();
+  if (restaurantAddress) printer.println(restaurantAddress);
+  if (restaurantPhone) printer.println(restaurantPhone);
+  
+  if (gstin) {
+    printer.println(`GSTIN - ${gstin}`);
+  }
+  if (vattin) {
+    printer.println(`VATTIN - ${vattin}`);
+  }
+  printer.newLine();
 }
 
 /**
