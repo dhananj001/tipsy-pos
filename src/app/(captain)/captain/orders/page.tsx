@@ -642,68 +642,71 @@ export default function GroupedBillsHistoryPage() {
 
       {/* Bill Editor / Invoice Detail Screen Drawer */}
       {selectedBill && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center select-none">
           <div 
-            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => setSelectedBill(null)}
           />
 
-          <div className="relative z-10 w-full max-w-md bg-background border border-zinc-200 dark:border-zinc-900 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-250 flex flex-col max-h-[90vh]">
-            <div className="h-1.5 w-12 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-4 sm:hidden shrink-0" />
+          <div className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-900 border-t border-zinc-200/60 dark:border-zinc-800 rounded-t-[32px] sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-250 max-h-[85vh] flex flex-col">
+            <div className="h-1.5 w-12 bg-zinc-250 dark:bg-zinc-800 rounded-full mx-auto mb-4 shrink-0" />
 
             {/* Header */}
-            <div className="flex items-start justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900 shrink-0">
+            <div className="flex items-start justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white font-black text-base shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 text-white font-black text-sm shadow-md shadow-orange-500/10">
                   T{selectedBill.tables?.number || '?'}
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-foreground">Adjust Bill Invoice</h3>
-                  <p className="text-[10px] text-muted-foreground font-bold">
-                    Inv: #{selectedBill.id.slice(0, 8).toUpperCase()} • {selectedBill.payments && selectedBill.payments.length > 0 ? 'Settled' : 'Active'}
+                  <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                    Adjust Bill Invoice
+                  </h3>
+                  <p className="text-[9px] text-zinc-400 font-bold mt-0.5">
+                    Inv: #{selectedBill.id.slice(0, 8).toUpperCase()} • <span className="capitalize text-orange-500 font-extrabold">{selectedBill.payments && selectedBill.payments.length > 0 ? 'Settled' : 'Active'}</span>
                   </p>
                 </div>
               </div>
               <button 
                 onClick={() => setSelectedBill(null)}
-                className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-foreground cursor-pointer"
+                className="p-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 dark:hover:text-white dark:hover:bg-zinc-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Scrollable pane */}
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-0.5">
+            <div className="flex-1 overflow-y-auto py-3 space-y-4 pr-0.5 scrollbar-none">
               
               {/* Ordered items listing */}
               <div>
-                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mb-2 px-1">Aggregated Dishes</span>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1.5 shrink-0">
+                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Aggregated Dishes</span>
+                  <span className="text-[9px] font-bold text-zinc-400">{aggregatedItems.length} items</span>
+                </div>
+                
+                <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-none pr-1 mt-2">
                   {aggregatedItems.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 rounded-xl border border-zinc-150 dark:border-zinc-900 bg-zinc-50/20 dark:bg-zinc-950/20 text-xs">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <span className="text-foreground">{item.name}</span>
+                    <div key={idx} className="flex justify-between items-center text-[10.5px] font-bold text-zinc-800 dark:text-zinc-200">
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate font-extrabold text-foreground">{item.name}</span>
+                        <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-medium">₹{item.price.toFixed(0)} each</span>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         {/* Qty Adjusters (Only editable if active/unpaid) */}
                         {(!selectedBill.payments || selectedBill.payments.length === 0) ? (
-                          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 text-foreground font-black text-[11px] h-6">
+                          <div className="flex items-center bg-zinc-150/50 dark:bg-zinc-800 rounded-xl h-6 p-0.5 border border-zinc-200/50 dark:border-zinc-800/80">
                             <button
                               onClick={() => handleUpdateItemQuantity(selectedBill.id, item.name, item.quantity, -1)}
-                              className="flex items-center justify-center w-5 h-5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
+                              className="w-5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-205 transition-colors"
                             >
-                              <Minus className="w-2.5 h-2.5 text-muted-foreground" />
+                              <Minus className="w-2.5 h-2.5 mx-auto" />
                             </button>
-                            
-                            <span className="w-5 text-center text-[10px] font-bold tabular-nums">
-                              {item.quantity}
-                            </span>
-
+                            <span className="w-4 text-center text-[9px] font-black text-foreground">{item.quantity}</span>
                             <button
                               onClick={() => handleUpdateItemQuantity(selectedBill.id, item.name, item.quantity, 1)}
-                              className="flex items-center justify-center w-5 h-5 hover:opacity-75 active:scale-75 transition-all cursor-pointer"
+                              className="w-5 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-205 transition-colors"
                             >
-                              <Plus className="w-2.5 h-2.5 text-muted-foreground" />
+                              <Plus className="w-2.5 h-2.5 mx-auto" />
                             </button>
                           </div>
                         ) : (
@@ -712,152 +715,111 @@ export default function GroupedBillsHistoryPage() {
                           </span>
                         )}
 
-                        <div className="font-black text-foreground w-16 text-right">
-                          ₹{(item.price * item.quantity).toFixed(2)}
-                        </div>
+                        <span className="w-14 text-right font-black font-mono text-foreground">
+                          ₹{(item.price * item.quantity).toFixed(0)}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Adjustments Editor */}
-              <div className="p-3.5 rounded-2xl bg-zinc-100/50 dark:bg-zinc-900/40 border border-zinc-200/50 dark:border-zinc-850/50 space-y-3">
-                <div className="flex items-center gap-1.5 text-[9.5px] font-black text-foreground uppercase tracking-wider">
-                  <Percent className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Adjust Taxes & Discounts</span>
+              {/* Adjustments Dropdowns Row */}
+              <div className="grid grid-cols-4 gap-2 bg-zinc-50/50 dark:bg-zinc-900/40 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-850">
+                {/* Discount */}
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">Discount</span>
+                  <select
+                    value={discountPercent}
+                    onChange={(e) => setDiscountPercent(Number(e.target.value))}
+                    className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                  >
+                    {[0, 5, 10, 15, 20].map(val => (
+                      <option key={val} value={val}>{val}%</option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Discount Select */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-                    <span>Discount %</span>
-                    <span className="text-foreground font-black text-xs">{discountPercent}% (₹{discountAmount.toFixed(1)})</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {[0, 5, 10, 15, 20].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setDiscountPercent(val)}
-                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
-                          discountPercent === val 
-                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
-                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
-                        }`}
-                      >
-                        {val}%
-                      </button>
+                {/* GST */}
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">GST Tax</span>
+                  <select
+                    value={taxPercent}
+                    onChange={(e) => setTaxPercent(Number(e.target.value))}
+                    className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                  >
+                    {[0, 5, 12, 18, 28].map(val => (
+                      <option key={val} value={val}>{val}%</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
 
-                {/* GST Tax Select */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-                    <span>GST Tax %</span>
-                    <span className="text-foreground font-black text-xs">{taxPercent}% (₹{taxAmount.toFixed(1)})</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {[0, 5, 12, 18, 28].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setTaxPercent(val)}
-                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
-                          taxPercent === val 
-                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
-                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
-                        }`}
-                      >
-                        {val}%
-                      </button>
+                {/* VAT */}
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">VAT</span>
+                  <select
+                    value={vatPercent}
+                    onChange={(e) => setVatPercent(Number(e.target.value))}
+                    className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                  >
+                    {[0, 5, 10, 14.5, 20].map(val => (
+                      <option key={val} value={val}>{val}%</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
 
-                {/* VAT Select */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-                    <span>VAT %</span>
-                    <span className="text-foreground font-black text-xs">{vatPercent}% (₹{vatAmount.toFixed(1)})</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {[0, 5, 10, 14.5, 20].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setVatPercent(val)}
-                        className={`flex-1 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
-                          vatPercent === val 
-                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
-                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
-                        }`}
-                      >
-                        {val}%
-                      </button>
+                {/* Service Charge */}
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block px-0.5">S. Charge</span>
+                  <select
+                    value={serviceChargePercent}
+                    onChange={(e) => setServiceChargePercent(Number(e.target.value))}
+                    className="w-full bg-background border border-zinc-200/70 dark:border-zinc-800 rounded-xl px-1.5 py-1 text-[10px] font-bold text-foreground focus:outline-none focus:border-orange-500 cursor-pointer"
+                  >
+                    {[0, 5, 10].map(val => (
+                      <option key={val} value={val}>{val}%</option>
                     ))}
-                  </div>
-                </div>
-
-                {/* Service Charge Select */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-                    <span>Service Charge %</span>
-                    <span className="text-foreground font-black text-xs">{serviceChargePercent}% (₹{serviceChargeAmount.toFixed(1)})</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {[0, 5, 10].map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setServiceChargePercent(val)}
-                        className={`px-4.5 py-1 rounded-lg text-[9.5px] font-extrabold border transition-all ${
-                          serviceChargePercent === val 
-                            ? 'bg-zinc-900 text-white border-zinc-950 dark:bg-zinc-100 dark:text-zinc-950 dark:border-white'
-                            : 'border-zinc-250/50 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-background'
-                        }`}
-                      >
-                        {val}%
-                      </button>
-                    ))}
-                  </div>
+                  </select>
                 </div>
               </div>
 
-              {/* Calculations Summary */}
-              <div className="border-t border-zinc-150 dark:border-zinc-900 pt-3 space-y-2">
-                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+              {/* Checkout Computations Summary */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-850/80 space-y-2 text-[10.5px] font-bold text-zinc-500 dark:text-zinc-400 shadow-inner">
+                <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-bold text-foreground">₹{subtotal.toFixed(2)}</span>
+                  <span className="text-zinc-900 dark:text-white font-mono font-black">₹{subtotal.toFixed(2)}</span>
                 </div>
-                {discountPercent > 0 && (
-                  <div className="flex justify-between text-[11px] font-semibold text-rose-500 px-1">
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-rose-500 font-extrabold">
                     <span>Discount ({discountPercent}%)</span>
-                    <span className="font-bold">-₹{discountAmount.toFixed(2)}</span>
+                    <span className="font-mono font-black">-₹{discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
-                  <span>GST Tax ({taxPercent}%)</span>
-                  <span className="font-bold text-foreground">₹{taxAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
-                  <span>VAT ({vatPercent}%)</span>
-                  <span className="font-bold text-foreground">₹{vatAmount.toFixed(2)}</span>
-                </div>
-                {serviceChargePercent > 0 && (
-                  <div className="flex justify-between text-[11px] font-semibold text-muted-foreground px-1">
+                {taxAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>GST ({taxPercent}%)</span>
+                    <span className="text-zinc-900 dark:text-white font-mono font-black">₹{taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {vatAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>VAT ({vatPercent}%)</span>
+                    <span className="text-zinc-900 dark:text-white font-mono font-black">₹{vatAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {serviceChargeAmount > 0 && (
+                  <div className="flex justify-between">
                     <span>Service Charge ({serviceChargePercent}%)</span>
-                    <span className="font-bold text-foreground">₹{serviceChargeAmount.toFixed(2)}</span>
+                    <span className="text-zinc-900 dark:text-white font-mono font-black">₹{serviceChargeAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-xs font-black text-foreground pt-1.5 px-1 border-t border-dashed border-zinc-200 dark:border-zinc-900">
+                <div className="flex justify-between text-xs font-black text-foreground pt-1.5 border-t border-dashed border-zinc-200 dark:border-zinc-800 mt-1">
                   <span className="uppercase tracking-wider">Adjusted Grand Total</span>
-                  <span className="text-sm font-black text-amber-500">₹{grandTotal.toFixed(2)}</span>
+                  <span className="text-sm font-black text-amber-500 font-mono">₹{grandTotal.toFixed(2)}</span>
                 </div>
               </div>
 
-              {/* Payment Method adjustment if already paid */}
+              {/* Payment Method Used */}
               {selectedBill.payments && selectedBill.payments.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block px-1">Payment Method Used</span>
@@ -873,7 +835,7 @@ export default function GroupedBillsHistoryPage() {
                           className={`py-2 px-1 rounded-xl text-[10px] font-extrabold active:scale-95 transition-all text-center border cursor-pointer ${
                             isSelected 
                               ? 'bg-zinc-900 text-zinc-50 border-zinc-950 dark:bg-zinc-50 dark:text-zinc-950 dark:border-white shadow-sm'
-                              : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                              : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 bg-background'
                           }`}
                         >
                           {labels[method]}
@@ -887,11 +849,11 @@ export default function GroupedBillsHistoryPage() {
             </div>
 
             {/* Bottom Actions Row */}
-            <div className="pt-4 border-t border-zinc-150 dark:border-zinc-900 shrink-0 flex gap-2.5">
+            <div className="pt-3.5 border-t border-zinc-150 dark:border-zinc-800 shrink-0 flex gap-2">
               <button
                 onClick={() => setSelectedBill(null)}
                 disabled={savingBill}
-                className="flex-1 py-3.5 rounded-xl border border-zinc-250 bg-background text-foreground hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-xs font-bold cursor-pointer select-none active:scale-[0.98] transition-all"
+                className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 bg-background text-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl text-xs font-bold cursor-pointer disabled:opacity-50 active:scale-95 transition-all"
               >
                 Cancel
               </button>
@@ -899,7 +861,7 @@ export default function GroupedBillsHistoryPage() {
               <button
                 onClick={handleSaveAndPrintBill}
                 disabled={savingBill}
-                className="flex-[2] py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-[0.98] transition-all cursor-pointer select-none disabled:opacity-50"
+                className="flex-[2] py-3 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-50 text-center"
               >
                 {savingBill ? (
                   <>
@@ -909,7 +871,7 @@ export default function GroupedBillsHistoryPage() {
                 ) : (
                   <>
                     <Printer className="w-4 h-4 text-white" />
-                    Save & Reprint Bill
+                    Save & Reprint
                   </>
                 )}
               </button>
@@ -918,7 +880,6 @@ export default function GroupedBillsHistoryPage() {
           </div>
         </div>
       )}
-
     </div>
   )
 }
