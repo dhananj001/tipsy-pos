@@ -193,25 +193,19 @@ function renderKOT(printer, payload) {
   printer.drawLine();
 
   // Columns Header
-  // 48 columns standard for 80mm thermal paper
-  // QTY (5) | ITEM NAME (33) | TYPE/NOTES
   printer.printBoldTrue();
-  printer.println(padRight("QTY", 6) + "ITEM NAME");
+  printer.println("ITEMS");
   printer.printBoldFalse();
   printer.drawLine();
 
   // List Items
   items.forEach(item => {
-    // Large Qty for absolute clarity
     printer.setTextDoubleHeight();
     printer.printBoldTrue();
-    printer.print(padRight(` ${item.quantity}x `, 7));
+    printer.println(`${item.name} x ${item.quantity}`);
     
     printer.setTextNormal();
     printer.printBoldFalse();
-    
-    // Print item name
-    printer.println(item.name);
 
     // If item has kitchen modifiers/notes, print prominently
     if (item.notes && item.notes.trim()) {
