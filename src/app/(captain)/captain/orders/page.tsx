@@ -3,15 +3,15 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
-import { 
-  Users, 
-  RefreshCw, 
-  Clock, 
-  AlertCircle, 
-  X, 
-  Loader2, 
-  CheckCircle2, 
-  FileText, 
+import {
+  Users,
+  RefreshCw,
+  Clock,
+  AlertCircle,
+  X,
+  Loader2,
+  CheckCircle2,
+  FileText,
   Printer,
   Search,
   Percent,
@@ -200,7 +200,7 @@ export default function GroupedBillsHistoryPage() {
 
   const aggregatedItems = getAggregatedItems(selectedBill)
   const subtotal = aggregatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  
+
   const discountAmount = subtotal * (discountPercent / 100)
   const taxableAmount = Math.max(0, subtotal - discountAmount)
   const taxAmount = taxableAmount * (taxPercent / 100)
@@ -274,7 +274,7 @@ export default function GroupedBillsHistoryPage() {
       if (updatedBill) {
         setSelectedBill(updatedBill as unknown as Order)
       }
-      
+
       fetchBillsHistory()
     } catch (err: any) {
       console.error('Failed to update quantity:', err)
@@ -334,7 +334,7 @@ export default function GroupedBillsHistoryPage() {
           .select('name, address, phone')
           .eq('id', profile.restaurant_id)
           .single()
-        
+
         if (rest) {
           restaurantName = rest.name || restaurantName
           address = rest.address || ''
@@ -409,7 +409,7 @@ export default function GroupedBillsHistoryPage() {
       list = list.filter(b => {
         const matchesTable = b.tables?.number?.toString().includes(q) || `t${b.tables?.number}`.includes(q)
         const matchesId = b.id.toLowerCase().includes(q)
-        const matchesItems = b.order_items.some(item => 
+        const matchesItems = b.order_items.some(item =>
           item.menu_items?.name?.toLowerCase().includes(q)
         )
         return matchesTable || matchesId || matchesItems
@@ -422,7 +422,7 @@ export default function GroupedBillsHistoryPage() {
   // Group bills by table number
   const groupedBillsByTable = useMemo(() => {
     const map = new Map<number, { tableId: string; tableNumber: number; orderTimeline: Order[] }>()
-    
+
     filteredBills.forEach((bill) => {
       const tNum = bill.tables?.number
       const tId = bill.tables?.id
@@ -438,7 +438,7 @@ export default function GroupedBillsHistoryPage() {
 
     // Sort by Table Number ascending
     const sortedGroups = Array.from(map.values()).sort((a, b) => a.tableNumber - b.tableNumber)
-    
+
     // Sort each table's timeline by time descending (newest first)
     sortedGroups.forEach(g => {
       g.orderTimeline.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -467,14 +467,14 @@ export default function GroupedBillsHistoryPage() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 relative pb-10">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black tracking-tight text-foreground">Billing History Logs</h2>
           <p className="text-[10px] text-muted-foreground">Detailed logs of cleared and active orders grouped by tables</p>
         </div>
-        
+
         <button
           onClick={() => fetchBillsHistory(true)}
           disabled={syncing}
@@ -518,7 +518,7 @@ export default function GroupedBillsHistoryPage() {
           className="w-full bg-zinc-100/60 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 rounded-2xl py-2.5 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
         />
         {searchQuery && (
-          <button 
+          <button
             onClick={() => setSearchQuery('')}
             className="absolute right-3.5 top-3 text-zinc-400 hover:text-foreground active:scale-90 transition-all"
           >
@@ -539,11 +539,10 @@ export default function GroupedBillsHistoryPage() {
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id as any)}
-              className={`py-1.5 text-[10px] font-extrabold rounded-xl uppercase tracking-wider transition-all active:scale-95 ${
-                isActive 
+              className={`py-1.5 text-[10px] font-extrabold rounded-xl uppercase tracking-wider transition-all active:scale-95 ${isActive
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black shadow-sm'
                   : 'text-zinc-500 hover:text-foreground'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -564,8 +563,8 @@ export default function GroupedBillsHistoryPage() {
             const clearedCount = group.orderTimeline.length - runningCount
 
             return (
-              <div 
-                key={group.tableId} 
+              <div
+                key={group.tableId}
                 onClick={() => setSelectedBill(group.orderTimeline[0])}
                 className="w-full text-left p-4 rounded-3xl border border-zinc-150 dark:border-zinc-900/60 bg-zinc-50/15 dark:bg-zinc-950/10 space-y-3 cursor-pointer transition-all hover:bg-zinc-100/50 dark:hover:bg-zinc-950/30 active:scale-[0.99] block"
               >
@@ -589,7 +588,7 @@ export default function GroupedBillsHistoryPage() {
                   {group.orderTimeline.map((bill, index) => {
                     const hasPayment = bill.payments && bill.payments.length > 0
                     const payment = bill.payments?.[0]
-                    
+
                     // Simple description of ordered items
                     const itemsDesc = bill.order_items
                       .map(oi => `${oi.quantity}x ${oi.menu_items?.name || 'Unknown'}`)
@@ -611,7 +610,7 @@ export default function GroupedBillsHistoryPage() {
                               </span>
                             )}
                           </div>
-                          
+
                           {/* Dish details list */}
                           <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
                             {itemsDesc || 'No items selected'}
@@ -625,11 +624,10 @@ export default function GroupedBillsHistoryPage() {
 
                         <div className="text-right flex flex-col items-end gap-1.5 shrink-0 self-center">
                           <span className="text-xs font-black text-foreground">₹{bill.total_amount.toFixed(2)}</span>
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${
-                            hasPayment 
-                              ? 'bg-emerald-500/5 text-emerald-600 border-emerald-500/20' 
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${hasPayment
+                              ? 'bg-emerald-500/5 text-emerald-600 border-emerald-500/20'
                               : 'bg-amber-500/5 text-amber-600 border-amber-500/20'
-                          }`}>
+                            }`}>
                             {hasPayment ? 'Cleared' : 'Unpaid'}
                           </span>
                         </div>
@@ -646,7 +644,7 @@ export default function GroupedBillsHistoryPage() {
       {/* Bill Editor / Invoice Detail Screen Drawer */}
       {selectedBill && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center select-none">
-          <div 
+          <div
             className="fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => setSelectedBill(null)}
           />
@@ -669,7 +667,7 @@ export default function GroupedBillsHistoryPage() {
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedBill(null)}
                 className="p-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 dark:hover:text-white dark:hover:bg-zinc-800"
               >
@@ -679,14 +677,14 @@ export default function GroupedBillsHistoryPage() {
 
             {/* Scrollable pane */}
             <div className="flex-1 overflow-y-auto py-3 space-y-4 pr-0.5 scrollbar-none">
-              
+
               {/* Ordered items listing */}
               <div>
                 <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1.5 shrink-0">
                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Aggregated Dishes</span>
                   <span className="text-[9px] font-bold text-zinc-400">{aggregatedItems.length} items</span>
                 </div>
-                
+
                 <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-none pr-1 mt-2">
                   {aggregatedItems.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center text-[10.5px] font-bold text-zinc-800 dark:text-zinc-200">
@@ -835,11 +833,10 @@ export default function GroupedBillsHistoryPage() {
                           key={method}
                           type="button"
                           onClick={() => setPaymentMethod(method)}
-                          className={`py-2 px-1 rounded-xl text-[10px] font-extrabold active:scale-95 transition-all text-center border cursor-pointer ${
-                            isSelected 
+                          className={`py-2 px-1 rounded-xl text-[10px] font-extrabold active:scale-95 transition-all text-center border cursor-pointer ${isSelected
                               ? 'bg-zinc-900 text-zinc-50 border-zinc-950 dark:bg-zinc-50 dark:text-zinc-950 dark:border-white shadow-sm'
                               : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 bg-background'
-                          }`}
+                            }`}
                         >
                           {labels[method]}
                         </button>
@@ -886,3 +883,5 @@ export default function GroupedBillsHistoryPage() {
     </div>
   )
 }
+
+
