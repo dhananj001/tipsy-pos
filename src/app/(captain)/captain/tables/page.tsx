@@ -77,7 +77,7 @@ export default function TablesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [taxPercent, setTaxPercent] = useState<number>(5)
-  const [vatPercent, setVatPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(10)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [serviceChargePercent, setServiceChargePercent] = useState<number>(0)
 
@@ -1031,7 +1031,7 @@ export default function TablesPage() {
       setActiveOrders(runningOrders)
       setBillingMode(false)
       setTaxPercent(5)
-      setVatPercent(5)
+      setVatPercent(10)
       setDiscountPercent(0)
       setServiceChargePercent(0)
       fetchActiveOrders(selectedTable.id)

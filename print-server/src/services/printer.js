@@ -247,13 +247,21 @@ function renderBill(printer, payload) {
     timestamp = new Date().toISOString(),
     items = [],
     taxPercent = 5,
-    vatPercent = 5,
+    vatPercent = 10,
     discountPercent = 0,
     serviceChargePercent = 0,
     capacity = 0,
     gstin = "",
     vattin = ""
   } = payload;
+
+  if (
+    restaurantName === "Tipsy POS Sandbox" ||
+    restaurantName === "Tipsy POS" ||
+    restaurantName.toLowerCase().includes("sandbox")
+  ) {
+    restaurantName = "Tipsy-Bar, Beer & Eatery";
+  }
 
   // Professional defaults matching DotPe style for "Tipsy Duckling" if not explicitly provided
   if (restaurantName.toLowerCase().includes("tipsy") || restaurantName.toLowerCase().includes("duckling")) {
@@ -263,9 +271,9 @@ function renderBill(printer, payload) {
     if (!restaurantPhone) restaurantPhone = "9130182609";
   }
 
-  // Auto tax rate fallbacks (5% foods, 5% drinks)
-  const effectiveGstPercent = taxPercent || 5;
-  const effectiveVatPercent = vatPercent || 5;
+  // Auto tax rate fallbacks (5% foods, 10% drinks)
+  const effectiveGstPercent = taxPercent !== undefined ? taxPercent : 5;
+  const effectiveVatPercent = vatPercent !== undefined ? vatPercent : 10;
 
   const gstItems = items.filter(item => (item.printer_type || "kitchen").toLowerCase() !== "bar");
   const vatItems = items.filter(item => (item.printer_type || "").toLowerCase() === "bar");
@@ -338,6 +346,7 @@ function renderBill(printer, payload) {
   // ==================== SECTION 1: STATEMENT ====================
   printer.alignCenter();
   printer.printBoldTrue();
+  printer.println("Tipsy-Bar, Beer & Eatery");
   printer.println("Statement");
   printer.printBoldFalse();
   printer.newLine();

@@ -78,7 +78,7 @@ function OrderPageContent() {
   
   // Custom Taxes and Discounts on Cart
   const [taxPercent, setTaxPercent] = useState<number>(5) // Default 5%
-  const [vatPercent, setVatPercent] = useState<number>(0) // Default 0%
+  const [vatPercent, setVatPercent] = useState<number>(10) // Default 10%
   const [discountPercent, setDiscountPercent] = useState<number>(0) // Default 0%
   
   // UI States
@@ -374,12 +374,24 @@ function OrderPageContent() {
     return item ? item.notes : ''
   }
 
-  // Calculations
-  const cartSubtotal = cart.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0)
-  const discountAmount = cartSubtotal * (discountPercent / 100)
-  const taxableAmount = Math.max(0, cartSubtotal - discountAmount)
-  const cartTax = taxableAmount * (taxPercent / 100)
-  const cartVat = taxableAmount * (vatPercent / 100)
+  const gstItems = cart.filter(item => (item.menuItem.printer_type || 'kitchen').toLowerCase() !== 'bar')
+  const vatItems = cart.filter(item => (item.menuItem.printer_type || '').toLowerCase() === 'bar')
+  
+  const gstSubtotal = gstItems.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0)
+  const vatSubtotal = vatItems.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0)
+  
+  const gstDiscount = gstSubtotal * (discountPercent / 100)
+  const vatDiscount = vatSubtotal * (discountPercent / 100)
+  
+  const gstTaxable = Math.max(0, gstSubtotal - gstDiscount)
+  const vatTaxable = Math.max(0, vatSubtotal - vatDiscount)
+  
+  const cartSubtotal = gstSubtotal + vatSubtotal
+  const discountAmount = gstDiscount + vatDiscount
+  const taxableAmount = gstTaxable + vatTaxable
+  
+  const cartTax = gstTaxable * (taxPercent / 100)
+  const cartVat = vatTaxable * (vatPercent / 100)
   const cartTotal = taxableAmount + cartTax + cartVat
   const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
 

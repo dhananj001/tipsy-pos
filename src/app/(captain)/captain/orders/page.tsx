@@ -79,7 +79,7 @@ export default function GroupedBillsHistoryPage() {
 
   // Edit Bill States
   const [taxPercent, setTaxPercent] = useState<number>(5)
-  const [vatPercent, setVatPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(10)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [serviceChargePercent, setServiceChargePercent] = useState<number>(0)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
@@ -175,7 +175,7 @@ export default function GroupedBillsHistoryPage() {
       }
       setDiscountPercent(0)
       setTaxPercent(5)
-      setVatPercent(5)
+      setVatPercent(10)
       setServiceChargePercent(0)
     }
   }, [selectedBill])

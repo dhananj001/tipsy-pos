@@ -46,7 +46,7 @@ export default function AdminTablesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'card'>('upi')
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [taxPercent, setTaxPercent] = useState<number>(5)
-  const [vatPercent, setVatPercent] = useState<number>(5)
+  const [vatPercent, setVatPercent] = useState<number>(10)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
 
   // --- Confirmation Dialog State ---
@@ -183,7 +183,7 @@ export default function AdminTablesPage() {
       fetchActiveOrders(selectedTable.id)
       setBillingMode(false)
       setTaxPercent(5)
-      setVatPercent(5)
+      setVatPercent(10)
       setDiscountPercent(0)
     } else {
       setActiveOrders([])
