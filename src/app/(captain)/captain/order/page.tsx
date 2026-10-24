@@ -662,11 +662,19 @@ function OrderPageContent() {
       <div className="relative mb-4 shrink-0">
         <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400" />
         <input
-          type="text"
+          type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          name="order-dish-search"
+          id="order-dish-search"
           placeholder={`Search ${superCategory === 'all' ? 'any item' : superCategory === 'food' ? 'dishes' : 'beverages'}...`}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-zinc-100/60 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 rounded-2xl py-2.5 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+          className="w-full bg-zinc-100/60 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 rounded-2xl py-2.5 pl-10 pr-10 text-[16px] md:text-xs font-semibold focus:outline-none focus:border-amber-500 dark:focus:border-amber-500 transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-foreground"
         />
         {searchQuery && (
           <button 

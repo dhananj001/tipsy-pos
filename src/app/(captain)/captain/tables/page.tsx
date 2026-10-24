@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { MENU_CATEGORIES, MENU_ITEMS } from '@/lib/menu-data'
@@ -90,6 +90,7 @@ export default function TablesPage() {
   const [superCategory, setSuperCategory] = useState<'all' | 'food' | 'drinks'>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -1309,16 +1310,43 @@ export default function TablesPage() {
             ))}
           </div>
 
-          {/* Search bar */}
+          {/* Search bar - Apple-grade Mobile UX */}
           <div className="relative mt-3 shrink-0">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-zinc-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
             <input
-              type="text"
-              placeholder="Search food, beverages..."
+              ref={searchInputRef}
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              name="menu-dish-search"
+              id="menu-dish-search"
+              placeholder="Search dishes, drinks, appetizers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-zinc-900/40 border border-zinc-250/70 dark:border-zinc-850 rounded-2xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 placeholder-zinc-400 transition-all font-medium text-zinc-900 dark:text-white"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  searchInputRef.current?.blur()
+                }
+              }}
+              className="w-full bg-zinc-100/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl py-2.5 pl-10 pr-10 text-[16px] md:text-xs font-semibold focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 placeholder-zinc-400 dark:placeholder-zinc-500 transition-all text-foreground"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('')
+                  searchInputRef.current?.focus()
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-zinc-500 hover:text-foreground active:scale-90 transition-all cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Category horizontal pills */}
@@ -1339,8 +1367,8 @@ export default function TablesPage() {
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-4 py-2 rounded-full text-[10px] font-black whitespace-nowrap border transition-all active:scale-95 ${
                   selectedCategory === cat.id 
-                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 border-transparent shadow-sm' 
-                    : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 text-zinc-500'
+                  ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 border-transparent shadow-sm' 
+                  : 'bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 text-zinc-500'
                 }`}
               >
                 {cat.name}
@@ -1348,8 +1376,15 @@ export default function TablesPage() {
             ))}
           </div>
 
-          {/* Menu Items List (Scrollable Area) */}
-          <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1 sleek-scrollbar">
+          {/* Menu Items List (Scrollable Area with mobile keyboard auto-dismiss) */}
+          <div 
+            className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1 sleek-scrollbar"
+            onTouchMove={() => {
+              if (document.activeElement === searchInputRef.current) {
+                searchInputRef.current?.blur()
+              }
+            }}
+          >
             {loadingMenu ? (
               <div className="py-20 flex flex-col items-center justify-center space-y-3">
                 <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
