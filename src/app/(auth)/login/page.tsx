@@ -158,7 +158,7 @@ export default function LoginPage() {
           <TipsyLogo size={56} priority />
         </div>
         <h2 className="text-xl font-bold tracking-tight text-foreground">Sign In to Tipsy POS</h2>
-        <p className="text-xs text-muted-foreground">Select a sandbox role or enter your credentials</p>
+        <p className="text-xs text-muted-foreground">Enter your staff credentials to access your terminal</p>
       </div>
 
       {/* Alerts */}
@@ -217,7 +217,10 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {/* Quick Sandbox Bypass */}
+      {/* 
+        Quick Sandbox Bypass (Disabled for production)
+        Uncomment during development if quick mock login buttons are needed:
+      
       <div className="relative flex items-center justify-center my-6">
         <span className="absolute w-full h-[1px] bg-zinc-100 dark:bg-zinc-900"></span>
         <span className="relative text-[9px] font-bold text-muted-foreground bg-background px-3 uppercase tracking-wider">Sandbox Quick Logins</span>
@@ -254,6 +257,7 @@ export default function LoginPage() {
           <span className="text-[8px] text-muted-foreground leading-none">Control Room</span>
         </button>
       </div>
+      */}
 
     </div>
   )

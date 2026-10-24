@@ -1349,7 +1349,7 @@ export default function TablesPage() {
           </div>
 
           {/* Menu Items List (Scrollable Area) */}
-          <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-0.5">
+          <div className="flex-1 overflow-y-auto space-y-2.5 pb-24 pr-1 sleek-scrollbar">
             {loadingMenu ? (
               <div className="py-20 flex flex-col items-center justify-center space-y-3">
                 <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin"></div>

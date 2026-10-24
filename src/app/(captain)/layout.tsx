@@ -84,7 +84,7 @@ export default function CaptainLayout({
         </header>
 
         {/* Dynamic Main Body Scroll Area */}
-        <main className="flex-1 overflow-y-auto px-4 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <main className="flex-1 overflow-y-auto px-4 py-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sleek-scrollbar">
           {children}
         </main>
 
