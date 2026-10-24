@@ -3,7 +3,8 @@
 ## 📚 Essential Project Documentation
 - **[System Architecture & Changelog](CHANGELOG_AND_FIXES.md)**: Detailed root-cause breakdown of all database schema fixes, foreign key resolutions, and user-tenant linking.
 - **[Local Print Server Architecture](allprintersworking.md)**: Hardware configurations and Windows spooler bypass guide for the print server.
-- **[Host Machine Installation Guide](updatedinstallingonhost.md)**: PM2 and Windows service setup instructions for deployment.
+- **[PM2 Background Service Guide](pm2.md)**: Foolproof step-by-step instructions to configure PM2 auto-restart and boot startup on `DESKTOP-VJVJQ4E`.
+- **[Host Machine Installation Guide](updatedinstallingonhost.md)**: Deployment instructions and prerequisites for the client PC.
 - **[Official Menu Backup & Schema](MENU_BACKUP_AND_SCHEMA.md)**: Full verified list of 40 categories and 552 menu items.
 
 ---
