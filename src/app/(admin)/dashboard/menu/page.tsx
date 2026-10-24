@@ -99,68 +99,16 @@ export default function MenuManagementPage() {
 
       if (itemError) throw itemError
 
-      // Auto-Seed Initial Sandbox Menu Data if completely empty
-      if ((!catData || catData.length === 0) && (!itemData || itemData.length === 0)) {
-        const categoriesToInsert = MENU_CATEGORIES.map(c => ({
-          restaurant_id: profile.restaurant_id,
-          name: c.name,
-          sort_order: c.sort_order
-        }))
-
-        const { data: newCats, error: seedCatError } = await supabase
-          .from('menu_categories')
-          .insert(categoriesToInsert)
-          .select()
-
-        if (seedCatError || !newCats) throw seedCatError || new Error('Seeding categories returned empty response')
-
-        const catMap = new Map(newCats.map((c: any) => [c.name, c.id]))
-
-        const itemsToInsert = MENU_ITEMS.map(item => {
-          const cat = MENU_CATEGORIES.find(c => c.name === item.categoryName)
-          const printer_type = item.printer_type || cat?.printer_type || 'kitchen'
-          return {
-            restaurant_id: profile.restaurant_id,
-            category_id: catMap.get(item.categoryName),
-            name: item.name,
-            description: item.description || null,
-            price: item.price,
-            is_available: true,
-            printer_type
-          }
-        })
-
-        const { error: seedItemError } = await supabase
-          .from('menu_items')
-          .insert(itemsToInsert)
-
-        if (seedItemError) throw seedItemError
-
-        // Also seed printers if they do not exist
-        const { data: existingPrinters } = await supabase
-          .from('printers')
-          .select('name')
-          .eq('restaurant_id', profile.restaurant_id)
-
-        if (!existingPrinters || existingPrinters.length === 0) {
-          const printersToSeed = [
-            { restaurant_id: profile.restaurant_id, name: 'counter one', ip_address: '192.168.1.50', port: 9100, type: 'billing', is_active: true },
-            { restaurant_id: profile.restaurant_id, name: 'kitchen one', ip_address: '192.168.1.100', port: 9100, type: 'kitchen', is_active: true },
-            { restaurant_id: profile.restaurant_id, name: 'bar one', ip_address: '192.168.1.150', port: 9100, type: 'bar', is_active: true }
-          ]
-          await supabase.from('printers').insert(printersToSeed)
-        }
-        
-        // Re-fetch clean copy
-        fetchMenuData()
-        return
-      }
+      // Display empty state instead of browser auto-seeding
+      setCategories(catData || [])
+      setMenuItems(itemData || [])
+      return
 
       setCategories(catData || [])
       setMenuItems(itemData || [])
     } catch (err: any) {
-      console.error('Error fetching menu layouts:', err)
-      setError(err.message || 'Failed to sync menu data.')
+      console.error('Error fetching menu layouts:', err?.message || err, err?.details || '', err?.hint || '')
+      setError(err?.message || err?.error_description || 'Failed to sync menu data.')
     } finally {
       setLoading(false)
     }

@@ -112,21 +112,7 @@ export default function AdminTablesPage() {
 
       // 2. Seed tables if empty
       if (!data || data.length === 0) {
-        setSyncing(true)
-        const defaultTables = Array.from({ length: 12 }, (_, i) => ({
-          restaurant_id: profile.restaurant_id,
-          number: i + 1,
-          capacity: [2, 4, 6, 8][i % 4],
-          status: 'available' as const,
-        }))
-
-        const { data: seededData, error: seedError } = await supabase
-          .from('tables')
-          .upsert(defaultTables, { onConflict: 'restaurant_id,number' })
-          .select()
-
-        if (seedError) throw seedError
-        if (seededData) setTables(seededData as Table[])
+        setTables([])
       } else {
         setTables(data as Table[])
       }

@@ -180,38 +180,8 @@ function OrderPageContent() {
       }
 
       if ((!catData || catData.length === 0 || !itemData || itemData.length === 0) || forceSeed) {
-        if (profile.role === 'admin' || profile.role === 'manager') {
-          setSeeding(true)
-          await seedMenuData(profile.restaurant_id)
-          
-          const { data: seedCat } = await supabase
-            .from('menu_categories')
-            .select('id, name, sort_order')
-            .eq('restaurant_id', profile.restaurant_id)
-            .order('sort_order', { ascending: true })
-            
-          const { data: seedItem } = await supabase
-            .from('menu_items')
-            .select('id, name, description, price, is_available, printer_type, category_id')
-            .eq('restaurant_id', profile.restaurant_id)
-            .eq('is_available', true)
-            .order('name', { ascending: true })
-
-          const newCats = seedCat || []
-          const newItems = seedItem || []
-
-          setCategories(newCats)
-          setMenuItems(newItems)
-
-          if (newCats.length > 0 && newItems.length > 0) {
-            localStorage.setItem(
-              `${MENU_CACHE_KEY}-${profile.restaurant_id}`,
-              JSON.stringify({ categories: newCats, items: newItems, timestamp: Date.now() })
-            )
-          }
-        } else {
-          setError("The restaurant menu is currently empty. Please switch to an Admin/Manager account to seed the starting menu.")
-        }
+        setCategories([])
+        setMenuItems([])
       } else {
         setCategories(catData)
         setMenuItems(itemData)

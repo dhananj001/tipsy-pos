@@ -211,41 +211,7 @@ export default function TablesPage() {
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
-        setSyncing(true)
-        const defaultTables = Array.from({ length: 12 }, (_, i) => ({
-          restaurant_id: profile.restaurant_id,
-          number: i + 1,
-          capacity: [2, 4, 6, 8][i % 4],
-          status: 'available' as const,
-        }))
-
-        const { data: seededData, error: seedError } = await supabase
-          .from('tables')
-          .upsert(defaultTables, { onConflict: 'restaurant_id,number' })
-          .select(`
-            *,
-            orders (
-              id,
-              status,
-              total_amount,
-              created_at,
-              order_items (
-                id,
-                menu_item_id,
-                quantity,
-                price_at_order,
-                notes,
-                menu_items (
-                  name,
-                  price,
-                  printer_type
-                )
-              )
-            )
-          `)
-
-        if (seedError) throw seedError
-        if (seededData) setTables(seededData as Table[])
+        setTables([])
       } else {
         setTables(data as Table[])
       }
@@ -375,18 +341,11 @@ export default function TablesPage() {
 
       if (itemErr) throw itemErr
 
-      // Auto seed if empty
+      // Load fallback static items if DB not yet loaded
       if (!catData || catData.length === 0 || !itemData || itemData.length === 0) {
-        if (profile.role === 'admin' || profile.role === 'manager') {
-          await seedMenuData(profile.restaurant_id)
-          await fetchMenuData(true)
-          return
-        } else {
-          // If captain and DB empty, load fallback static items
-          loadFallbackMenu()
-          setLoadingMenu(false)
-          return
-        }
+        loadFallbackMenu()
+        setLoadingMenu(false)
+        return
       }
 
       setCategories(catData || [])

@@ -1,26 +1,40 @@
 -- =====================================================================
--- STEP 3 — INITIAL RESTAURANT POS DATABASE SCHEMA
+-- STEP 3 — INITIAL RESTAURANT POS DATABASE SCHEMA (SAFE / IDEMPOTENT)
 -- =====================================================================
--- Relies on Supabase Auth. Includes multi-tenant security by restaurant_id
--- and prepares for Role-Based Access Control (RBAC).
 
 -- ---------------------------------------------------------------------
--- 1. Create Enums
+-- 1. Create Enums (Idempotent)
 -- ---------------------------------------------------------------------
-CREATE TYPE public.user_role AS ENUM ('captain', 'manager', 'admin');
-CREATE TYPE public.table_status AS ENUM ('available', 'occupied', 'billing');
-CREATE TYPE public.order_status AS ENUM ('preparing', 'ready', 'served', 'cancelled');
-CREATE TYPE public.printer_type AS ENUM ('kitchen', 'bar', 'billing');
-CREATE TYPE public.payment_method AS ENUM ('cash', 'upi', 'card');
-CREATE TYPE public.payment_status AS ENUM ('pending', 'completed', 'failed');
-CREATE TYPE public.print_status AS ENUM ('pending', 'processing', 'printed', 'failed');
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE public.user_role AS ENUM ('captain', 'manager', 'admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'table_status') THEN
+        CREATE TYPE public.table_status AS ENUM ('available', 'occupied', 'billing');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
+        CREATE TYPE public.order_status AS ENUM ('preparing', 'ready', 'served', 'cancelled');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'printer_type') THEN
+        CREATE TYPE public.printer_type AS ENUM ('kitchen', 'bar', 'billing');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_method') THEN
+        CREATE TYPE public.payment_method AS ENUM ('cash', 'upi', 'card');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
+        CREATE TYPE public.payment_status AS ENUM ('pending', 'completed', 'failed');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'print_status') THEN
+        CREATE TYPE public.print_status AS ENUM ('pending', 'processing', 'printed', 'failed');
+    END IF;
+END $$;
 
 -- ---------------------------------------------------------------------
--- 2. Create Tables
+-- 2. Create Tables (IF NOT EXISTS)
 -- ---------------------------------------------------------------------
 
 -- Restaurants Table (Multi-tenant Root)
-CREATE TABLE public.restaurants (
+CREATE TABLE IF NOT EXISTS public.restaurants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     address TEXT,
@@ -30,7 +44,7 @@ CREATE TABLE public.restaurants (
 );
 
 -- Users (Profiles) Table - linked to Supabase auth.users
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
@@ -41,7 +55,7 @@ CREATE TABLE public.users (
 );
 
 -- Tables (Physical Dining Tables)
-CREATE TABLE public.tables (
+CREATE TABLE IF NOT EXISTS public.tables (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     number INT NOT NULL,
@@ -53,7 +67,7 @@ CREATE TABLE public.tables (
 );
 
 -- Menu Categories Table
-CREATE TABLE public.menu_categories (
+CREATE TABLE IF NOT EXISTS public.menu_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -64,7 +78,7 @@ CREATE TABLE public.menu_categories (
 );
 
 -- Menu Items Table
-CREATE TABLE public.menu_items (
+CREATE TABLE IF NOT EXISTS public.menu_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     category_id UUID NOT NULL REFERENCES public.menu_categories(id) ON DELETE CASCADE,
@@ -78,7 +92,7 @@ CREATE TABLE public.menu_items (
 );
 
 -- Orders Table
-CREATE TABLE public.orders (
+CREATE TABLE IF NOT EXISTS public.orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     table_id UUID NOT NULL REFERENCES public.tables(id) ON DELETE RESTRICT,
@@ -90,7 +104,7 @@ CREATE TABLE public.orders (
 );
 
 -- Order Items Table
-CREATE TABLE public.order_items (
+CREATE TABLE IF NOT EXISTS public.order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
@@ -103,7 +117,7 @@ CREATE TABLE public.order_items (
 );
 
 -- Printers Table
-CREATE TABLE public.printers (
+CREATE TABLE IF NOT EXISTS public.printers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -116,7 +130,7 @@ CREATE TABLE public.printers (
 );
 
 -- Payments Table
-CREATE TABLE public.payments (
+CREATE TABLE IF NOT EXISTS public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
@@ -129,7 +143,7 @@ CREATE TABLE public.payments (
 );
 
 -- Print Jobs Table
-CREATE TABLE public.print_jobs (
+CREATE TABLE IF NOT EXISTS public.print_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES public.restaurants(id) ON DELETE CASCADE,
     printer_id UUID NOT NULL REFERENCES public.printers(id) ON DELETE CASCADE,
@@ -152,42 +166,56 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply timestamp updater to all tables
+DROP TRIGGER IF EXISTS set_timestamp_restaurants ON public.restaurants;
 CREATE TRIGGER set_timestamp_restaurants BEFORE UPDATE ON public.restaurants FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_users ON public.users;
 CREATE TRIGGER set_timestamp_users BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_tables ON public.tables;
 CREATE TRIGGER set_timestamp_tables BEFORE UPDATE ON public.tables FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_menu_categories ON public.menu_categories;
 CREATE TRIGGER set_timestamp_menu_categories BEFORE UPDATE ON public.menu_categories FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_menu_items ON public.menu_items;
 CREATE TRIGGER set_timestamp_menu_items BEFORE UPDATE ON public.menu_items FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_orders ON public.orders;
 CREATE TRIGGER set_timestamp_orders BEFORE UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_order_items ON public.order_items;
 CREATE TRIGGER set_timestamp_order_items BEFORE UPDATE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_printers ON public.printers;
 CREATE TRIGGER set_timestamp_printers BEFORE UPDATE ON public.printers FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_payments ON public.payments;
 CREATE TRIGGER set_timestamp_payments BEFORE UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+DROP TRIGGER IF EXISTS set_timestamp_print_jobs ON public.print_jobs;
 CREATE TRIGGER set_timestamp_print_jobs BEFORE UPDATE ON public.print_jobs FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 -- ---------------------------------------------------------------------
 -- 4. Create Recommended Indexes
 -- ---------------------------------------------------------------------
--- Crucial for fast real-time query scaling and multi-tenant lookups.
-
-CREATE INDEX idx_users_restaurant ON public.users(restaurant_id);
-CREATE INDEX idx_tables_restaurant ON public.tables(restaurant_id);
-CREATE INDEX idx_tables_status ON public.tables(restaurant_id, status);
-CREATE INDEX idx_menu_categories_restaurant ON public.menu_categories(restaurant_id, sort_order);
-CREATE INDEX idx_menu_items_restaurant ON public.menu_items(restaurant_id);
-CREATE INDEX idx_menu_items_category ON public.menu_items(category_id);
-CREATE INDEX idx_orders_restaurant ON public.orders(restaurant_id);
-CREATE INDEX idx_orders_table ON public.orders(table_id);
-CREATE INDEX idx_orders_status ON public.orders(restaurant_id, status);
-CREATE INDEX idx_order_items_order ON public.order_items(order_id);
-CREATE INDEX idx_printers_restaurant ON public.printers(restaurant_id);
-CREATE INDEX idx_payments_order ON public.payments(order_id);
-CREATE INDEX idx_print_jobs_status ON public.print_jobs(restaurant_id, status);
+CREATE INDEX IF NOT EXISTS idx_users_restaurant ON public.users(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_tables_restaurant ON public.tables(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_tables_status ON public.tables(restaurant_id, status);
+CREATE INDEX IF NOT EXISTS idx_menu_categories_restaurant ON public.menu_categories(restaurant_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant ON public.menu_items(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_category ON public.menu_items(category_id);
+CREATE INDEX IF NOT EXISTS idx_orders_restaurant ON public.orders(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_orders_table ON public.orders(table_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(restaurant_id, status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_printers_restaurant ON public.printers(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order ON public.payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON public.print_jobs(restaurant_id, status);
 
 -- ---------------------------------------------------------------------
 -- 5. Row-Level Security (RLS) Policies
 -- ---------------------------------------------------------------------
-
--- Enable Row-Level Security on all tables
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
@@ -199,7 +227,6 @@ ALTER TABLE public.printers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.print_jobs ENABLE ROW LEVEL SECURITY;
 
--- Helper Function to resolve user's tenant (restaurant_id)
 CREATE OR REPLACE FUNCTION public.get_tenant_id()
 RETURNS UUID SECURITY DEFINER AS $$
 BEGIN
@@ -207,7 +234,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Helper Function to resolve user's role
+DROP FUNCTION IF EXISTS public.get_user_role() CASCADE;
 CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS public.user_role SECURITY DEFINER AS $$
 BEGIN
@@ -215,11 +242,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- A. Restaurants Policies
+-- Drop existing policies if any to prevent collision
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Users can read their own restaurant" ON public.restaurants;
+    DROP POLICY IF EXISTS "Staff can view other profiles in same restaurant" ON public.users;
+    DROP POLICY IF EXISTS "Only admins/managers can update profiles" ON public.users;
+    DROP POLICY IF EXISTS "Staff can view tables" ON public.tables;
+    DROP POLICY IF EXISTS "Staff can edit tables" ON public.tables;
+    DROP POLICY IF EXISTS "Anyone in restaurant can read categories" ON public.menu_categories;
+    DROP POLICY IF EXISTS "Only admins/managers can alter categories" ON public.menu_categories;
+    DROP POLICY IF EXISTS "Anyone in restaurant can read menu items" ON public.menu_items;
+    DROP POLICY IF EXISTS "Only admins/managers can alter menu items" ON public.menu_items;
+    DROP POLICY IF EXISTS "Staff can read and modify orders" ON public.orders;
+    DROP POLICY IF EXISTS "Staff can read and modify order items" ON public.order_items;
+    DROP POLICY IF EXISTS "Staff can view printers" ON public.printers;
+    DROP POLICY IF EXISTS "Only admins/managers can modify printers" ON public.printers;
+    DROP POLICY IF EXISTS "Staff can read and create payments" ON public.payments;
+    DROP POLICY IF EXISTS "Staff can manage print jobs" ON public.print_jobs;
+END $$;
+
 CREATE POLICY "Users can read their own restaurant" ON public.restaurants
     FOR SELECT USING (id = public.get_tenant_id());
 
--- B. Users Policies
 CREATE POLICY "Staff can view other profiles in same restaurant" ON public.users
     FOR SELECT USING (restaurant_id = public.get_tenant_id());
 
@@ -229,14 +273,12 @@ CREATE POLICY "Only admins/managers can update profiles" ON public.users
         AND public.get_user_role() IN ('admin', 'manager')
     );
 
--- C. Tables Policies
 CREATE POLICY "Staff can view tables" ON public.tables
     FOR SELECT USING (restaurant_id = public.get_tenant_id());
 
 CREATE POLICY "Staff can edit tables" ON public.tables
     FOR ALL USING (restaurant_id = public.get_tenant_id());
 
--- D. Menu Categories Policies
 CREATE POLICY "Anyone in restaurant can read categories" ON public.menu_categories
     FOR SELECT USING (restaurant_id = public.get_tenant_id());
 
@@ -246,7 +288,6 @@ CREATE POLICY "Only admins/managers can alter categories" ON public.menu_categor
         AND public.get_user_role() IN ('admin', 'manager')
     );
 
--- E. Menu Items Policies
 CREATE POLICY "Anyone in restaurant can read menu items" ON public.menu_items
     FOR SELECT USING (restaurant_id = public.get_tenant_id());
 
@@ -256,15 +297,12 @@ CREATE POLICY "Only admins/managers can alter menu items" ON public.menu_items
         AND public.get_user_role() IN ('admin', 'manager')
     );
 
--- F. Orders Policies
 CREATE POLICY "Staff can read and modify orders" ON public.orders
     FOR ALL USING (restaurant_id = public.get_tenant_id());
 
--- G. Order Items Policies
 CREATE POLICY "Staff can read and modify order items" ON public.order_items
     FOR ALL USING (restaurant_id = public.get_tenant_id());
 
--- H. Printers Policies
 CREATE POLICY "Staff can view printers" ON public.printers
     FOR SELECT USING (restaurant_id = public.get_tenant_id());
 
@@ -274,20 +312,15 @@ CREATE POLICY "Only admins/managers can modify printers" ON public.printers
         AND public.get_user_role() IN ('admin', 'manager')
     );
 
--- I. Payments Policies
 CREATE POLICY "Staff can read and create payments" ON public.payments
     FOR ALL USING (restaurant_id = public.get_tenant_id());
 
--- J. Print Jobs Policies
 CREATE POLICY "Staff can manage print jobs" ON public.print_jobs
     FOR ALL USING (restaurant_id = public.get_tenant_id());
 
 -- ---------------------------------------------------------------------
 -- 6. Automatic User Synchronization Trigger (on Supabase Sign-Up)
 -- ---------------------------------------------------------------------
--- Automatically copies newly registered Supabase Auth users to public.users.
--- Synchronizes user_metadata: role, name, and restaurant_id.
-
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -295,25 +328,20 @@ DECLARE
     v_role public.user_role;
     v_name TEXT;
 BEGIN
-    -- Read metadata from signup claims
     v_name := COALESCE(new.raw_user_meta_data->>'name', 'Staff User');
     v_role := COALESCE((new.raw_user_meta_data->>'role')::public.user_role, 'captain'::public.user_role);
     v_restaurant_id := (new.raw_user_meta_data->>'restaurant_id')::UUID;
 
-    -- If restaurant_id is null, automatically seed/assign a default demo restaurant
     IF v_restaurant_id IS NULL THEN
-        -- Look up the existing default sandbox restaurant first
-        SELECT id INTO v_restaurant_id FROM public.restaurants WHERE name = 'Tipsy POS Sandbox' LIMIT 1;
+        SELECT id INTO v_restaurant_id FROM public.restaurants WHERE name = 'Tipsy POS Sandbox' OR slug = 'tipsy-pos-sandbox' LIMIT 1;
         
-        -- Only create a new one if it doesn't exist
         IF v_restaurant_id IS NULL THEN
-            INSERT INTO public.restaurants (name)
-            VALUES ('Tipsy POS Sandbox')
+            INSERT INTO public.restaurants (name, slug)
+            VALUES ('Tipsy POS Sandbox', 'tipsy-pos-sandbox')
             RETURNING id INTO v_restaurant_id;
         END IF;
     END IF;
 
-    -- Insert profile
     INSERT INTO public.users (id, restaurant_id, email, name, role)
     VALUES (
         new.id,
@@ -321,12 +349,19 @@ BEGIN
         new.email,
         v_name,
         v_role
-    );
+    )
+    ON CONFLICT (id) DO UPDATE
+    SET name = EXCLUDED.name,
+        role = EXCLUDED.role,
+        restaurant_id = EXCLUDED.restaurant_id,
+        updated_at = NOW();
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger execution link
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
