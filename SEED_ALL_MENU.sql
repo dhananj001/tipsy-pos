@@ -1423,9 +1423,10 @@ BEGIN
 
     -- 5. Ensure 12 Standard Tables exist
     FOR i IN 1..12 LOOP
-        INSERT INTO public.tables (restaurant_id, number, capacity, status)
-        VALUES (v_restaurant_id, i, CASE WHEN i % 4 = 1 THEN 2 WHEN i % 4 = 2 THEN 4 WHEN i % 4 = 3 THEN 6 ELSE 8 END, 'available')
-        ON CONFLICT (restaurant_id, number) DO NOTHING;
+        IF NOT EXISTS (SELECT 1 FROM public.tables WHERE restaurant_id = v_restaurant_id AND number = i) THEN
+            INSERT INTO public.tables (restaurant_id, number, capacity, status)
+            VALUES (v_restaurant_id, i, CASE WHEN i % 4 = 1 THEN 2 WHEN i % 4 = 2 THEN 4 WHEN i % 4 = 3 THEN 6 ELSE 8 END, 'available');
+        END IF;
     END LOOP;
 
 END $$;

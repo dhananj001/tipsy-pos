@@ -1,6 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tipsy POS
 
-## Getting Started
+## 📚 Essential Project Documentation
+- **[System Architecture & Changelog](CHANGELOG_AND_FIXES.md)**: Detailed root-cause breakdown of all database schema fixes, foreign key resolutions, and user-tenant linking.
+- **[Local Print Server Architecture](allprintersworking.md)**: Hardware configurations and Windows spooler bypass guide for the print server.
+- **[Host Machine Installation Guide](updatedinstallingonhost.md)**: PM2 and Windows service setup instructions for deployment.
+- **[Official Menu Backup & Schema](MENU_BACKUP_AND_SCHEMA.md)**: Full verified list of 40 categories and 552 menu items.
+
+---
 
 First, run the development server:
 
