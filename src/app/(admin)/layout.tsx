@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { useTheme } from '@/providers/theme-provider'
+import { TipsyLogo } from '@/components/tipsy-logo'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -87,9 +88,7 @@ export default function AdminLayout({
         {/* Sidebar Header Brand */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-100 px-4 dark:border-zinc-900">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-heading font-semibold text-white shadow-md shadow-amber-500/20">
-              T
-            </div>
+            <TipsyLogo size={36} priority />
             {!sidebarCollapsed && (
               <div className="flex flex-col">
                 <span className="text-sm font-heading font-semibold tracking-tight text-foreground leading-none">Tipsy POS</span>

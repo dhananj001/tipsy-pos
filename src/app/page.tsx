@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ArrowRight, Shield, Grid, CheckCircle2, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/providers/theme-provider'
 
+import { TipsyLogo } from '@/components/tipsy-logo'
+
 export default function Home() {
   const { theme, setTheme } = useTheme()
 
@@ -14,9 +16,7 @@ export default function Home() {
       {/* Sleek Top Navbar */}
       <header className="flex h-16 shrink-0 items-center justify-between px-6 md:px-12 border-b border-zinc-200/50 bg-background/80 backdrop-blur-md dark:border-zinc-900/50">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-extrabold text-white text-base shadow-md shadow-amber-500/20">
-            T
-          </div>
+          <TipsyLogo size={36} priority />
           <span className="text-sm font-bold tracking-tight text-foreground">Tipsy POS</span>
         </div>
 

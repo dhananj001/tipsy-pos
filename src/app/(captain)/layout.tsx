@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Grid, ClipboardList, User, LogOut, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/providers/theme-provider'
+import { TipsyLogo } from '@/components/tipsy-logo'
 
 export default function CaptainLayout({
   children,
@@ -54,9 +55,7 @@ export default function CaptainLayout({
         {/* Sleek Top Header */}
         <header className="flex h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] shrink-0 items-center justify-between border-b border-zinc-100 bg-background/85 px-4 backdrop-blur-md dark:border-zinc-900">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 font-bold text-white shadow-md shadow-amber-500/20">
-              T
-            </div>
+            <TipsyLogo size={36} priority />
             <div>
               <h1 className="text-sm font-bold tracking-tight text-foreground leading-none">Tipsy POS</h1>
               <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-0.5">Captain Terminal</p>

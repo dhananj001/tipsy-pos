@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Download, Share } from 'lucide-react'
+import { TipsyLogo } from '@/components/tipsy-logo'
 
 export function PWARegister() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -124,9 +125,7 @@ export function PWARegister() {
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md p-4 rounded-3xl bg-zinc-900/95 dark:bg-black/90 text-white border border-zinc-800/80 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-10 fade-in duration-500">
       <div className="flex items-start gap-3">
         {/* Brand Icon */}
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 font-extrabold text-white text-lg shadow-md shadow-amber-500/20">
-          T
-        </div>
+        <TipsyLogo size={44} priority />
 
         {/* Content */}
         <div className="flex-1 space-y-1">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LogIn, Shield, Grid, ClipboardList, Loader2 } from 'lucide-react'
+import { TipsyLogo } from '@/components/tipsy-logo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -153,8 +154,8 @@ export default function LoginPage() {
       
       {/* Brand Header */}
       <div className="text-center space-y-2 animate-in slide-in-from-top-3 duration-300">
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 font-extrabold text-white text-xl shadow-lg shadow-amber-500/20">
-          T
+        <div className="flex justify-center">
+          <TipsyLogo size={56} priority />
         </div>
         <h2 className="text-xl font-bold tracking-tight text-foreground">Sign In to Tipsy POS</h2>
         <p className="text-xs text-muted-foreground">Select a sandbox role or enter your credentials</p>
