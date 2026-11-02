@@ -59,7 +59,7 @@ export default function AdminLayout({
   }
 
   const menuItems = [
-    { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Restaurant Floor', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Table Layout', href: '/dashboard/tables', icon: Grid },
     { label: 'Menu Editor', href: '/dashboard/menu', icon: Utensils },
     { label: 'Live Orders', href: '/dashboard/orders', icon: ClipboardList },
