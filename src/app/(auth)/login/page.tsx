@@ -29,27 +29,32 @@ export default function LoginPage() {
     setInfo(null)
     
     try {
+      setInfo('Verifying credentials...')
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
       if (signInError) {
-        setError(signInError.message)
-      } else if (data?.user) {
+        setInfo(null)
+        setError(signInError.message || 'Invalid email or password.')
+        return
+      } 
+      
+      if (data?.user) {
+        setInfo('Authenticated! Loading your workspace...')
         const role = data.user.user_metadata?.role || 'captain'
         const searchParams = new URLSearchParams(window.location.search)
         const nextUrl = searchParams.get('next')
         
-        if (nextUrl) {
-          router.push(nextUrl)
-        } else {
-          router.push(role === 'admin' || role === 'manager' ? '/dashboard' : '/captain/tables')
-        }
-        router.refresh()
+        const destination = nextUrl || (role === 'admin' || role === 'manager' || role === 'super_admin' ? '/dashboard' : '/captain/tables')
+        
+        // Use hard window.location to ensure fresh cookie session is loaded across proxy/middleware
+        window.location.href = destination
       }
-    } catch (err) {
-      setError('An unexpected error occurred.')
+    } catch (err: any) {
+      setInfo(null)
+      setError(err?.message || 'An unexpected error occurred during login.')
     } finally {
       setLoading(false)
     }

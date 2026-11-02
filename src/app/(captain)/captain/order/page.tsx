@@ -423,6 +423,8 @@ function OrderPageContent() {
           table_id: tableId,
           captain_id: profile.id,
           status: 'preparing',
+          subtotal: cartSubtotal,
+          tax_amount: cartTax,
           total_amount: cartTotal
         })
         .select()
@@ -438,7 +440,8 @@ function OrderPageContent() {
         menu_item_id: c.menuItem.id,
         quantity: c.quantity,
         notes: c.notes || null,
-        price_at_order: c.menuItem.price
+        unit_price: c.menuItem.price,
+        total_price: c.menuItem.price * c.quantity
       }))
 
       const { error: itemsErr } = await supabase

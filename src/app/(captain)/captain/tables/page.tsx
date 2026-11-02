@@ -689,6 +689,8 @@ export default function TablesPage() {
           table_id: selectedTable.id,
           captain_id: profile.id,
           status: 'preparing',
+          subtotal: cartSubtotal,
+          tax_amount: cartSubtotal * 0.05,
           total_amount: cartTotal
         })
         .select()
@@ -699,13 +701,15 @@ export default function TablesPage() {
       // Create Order Items (ignoring fallback local IDs for DB safety)
       const orderItemsInsert = cart.map(c => {
         const isFallbackId = c.menuItem.id.startsWith('fallback-')
+        const itemTotal = c.menuItem.price * c.quantity
         return {
           restaurant_id: profile.restaurant_id,
           order_id: newOrder.id,
           menu_item_id: isFallbackId ? null : c.menuItem.id,
           quantity: c.quantity,
           notes: c.notes || null,
-          price_at_order: c.menuItem.price
+          unit_price: c.menuItem.price,
+          total_price: itemTotal
         }
       })
 
@@ -781,7 +785,8 @@ export default function TablesPage() {
       }
 
       if (printJobsToInsert.length > 0) {
-        await supabase.from('print_jobs').insert(printJobsToInsert)
+        const { error: printJobsErr } = await supabase.from('print_jobs').insert(printJobsToInsert)
+        if (printJobsErr) throw printJobsErr
       }
 
       // Cleanup
@@ -794,8 +799,16 @@ export default function TablesPage() {
         setSelectedTable(null)
       }, 1000)
     } catch (e: any) {
-      console.error(e)
-      setError('Failed to submit order.')
+      const errMsg = e?.message || e?.error_description || (typeof e === 'object' ? JSON.stringify(e) : String(e))
+      console.error('Order creation error details:', {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+        error: e
+      })
+      alert(`Order Failed: ${errMsg}`)
+      setError(errMsg)
     } finally {
       setSubmittingOrder(false)
     }

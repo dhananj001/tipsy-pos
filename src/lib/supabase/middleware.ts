@@ -42,15 +42,7 @@ export async function updateSession(request: NextRequest) {
   const redirectWithCookies = (targetUrl: string | URL) => {
     const redirectResponse = NextResponse.redirect(targetUrl)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value, {
-        path: cookie.path,
-        domain: cookie.domain,
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        sameSite: cookie.sameSite,
-        expires: cookie.expires,
-        maxAge: cookie.maxAge,
-      })
+      redirectResponse.cookies.set(cookie)
     })
     return redirectResponse
   }
@@ -66,17 +58,18 @@ export async function updateSession(request: NextRequest) {
   } else {
     // 2. Logged in
     const role = (user.user_metadata?.role as string) || 'captain'
+    const isAdminOrManager = role === 'admin' || role === 'manager' || role === 'super_admin'
 
     // If trying to access login page, redirect to their home page based on role
     if (isLoginRoute) {
       const url = request.nextUrl.clone()
-      url.pathname = (role === 'admin' || role === 'manager') ? '/dashboard' : '/captain/tables'
+      url.pathname = isAdminOrManager ? '/dashboard' : '/captain/tables'
       return redirectWithCookies(url)
     }
 
     // Role-based route protection for admin/manager pages
     if (isDashboardRoute) {
-      if (role !== 'admin' && role !== 'manager') {
+      if (!isAdminOrManager) {
         const url = request.nextUrl.clone()
         url.pathname = '/captain/tables'
         return redirectWithCookies(url)
@@ -85,7 +78,7 @@ export async function updateSession(request: NextRequest) {
 
     // Role-based route protection for captain pages
     if (isCaptainRoute) {
-      if (role !== 'captain' && role !== 'admin' && role !== 'manager') {
+      if (role !== 'captain' && !isAdminOrManager) {
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'
         return redirectWithCookies(url)
