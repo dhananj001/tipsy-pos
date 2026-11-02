@@ -19,7 +19,11 @@ import {
   Minus,
   Search,
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  Clock,
+  FileText,
+  Flame
 } from 'lucide-react'
 
 // Interfaces
@@ -114,35 +118,38 @@ export default function TablesPage() {
   const [showPrintMonitor, setShowPrintMonitor] = useState(false)
   const [newJobToast, setNewJobToast] = useState<{ id: string; type: string; status: string; message: string } | null>(null)
 
+  // --- KOT Confirmation & Live Print Report Modal States ---
+  const [showKOTConfirm, setShowKOTConfirm] = useState(false)
+  const [printReport, setPrintReport] = useState<{
+    isOpen: boolean
+    orderId: string
+    tableName: string
+    tableNumber: string
+    totalItems: number
+    jobs: {
+      id: string
+      printerId: string
+      printerName: string
+      printerType: string
+      status: 'sending' | 'pending' | 'printed' | 'failed'
+      errorMsg?: string
+      itemsCount: number
+    }[]
+  } | null>(null)
+
   const triggerSendKOT = () => {
     if (cart.length === 0) return
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Send KOT to Kitchen?',
-      description: `Send order of ${cart.reduce((s, c) => s + c.quantity, 0)} items to kitchen printers for Table ${selectedTable?.number}?`,
-      confirmText: 'Yes, Send KOT',
-      onConfirm: handlePlaceOrder
-    })
+    setShowKOTConfirm(true)
   }
 
   const triggerPrintBill = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Print Bill Ticket?',
-      description: `Request print server to print receipt invoice for Table ${selectedTable?.number}?`,
-      confirmText: 'Yes, Print',
-      onConfirm: () => printBill(false)
-    })
+    printBill(false)
   }
 
   const triggerClearTable = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Clear Table & Settle?',
-      description: `Process settlement and clear Table ${selectedTable?.number}? Active running orders will be finalized.`,
-      confirmText: 'Yes, Settle & Clear',
-      onConfirm: handleCheckout
-    })
+    if (confirm(`Clear Table T${selectedTable?.number} and finalize settlement?`)) {
+      handleCheckout()
+    }
   }
 
   const triggerUpdateTableStatus = (status: 'available' | 'occupied' | 'billing') => {
@@ -241,6 +248,8 @@ export default function TablesPage() {
             id,
             menu_item_id,
             quantity,
+            unit_price,
+            total_price,
             price_at_order,
             notes,
             menu_items (
@@ -597,6 +606,21 @@ export default function TablesPage() {
             const status = newJob.status
             const errorMsg = newJob.error_message
             const tableNo = newJob.payload?.tableNumber || ''
+
+            // Update live printReport if matching job exists
+            setPrintReport(prev => {
+              if (!prev) return null
+              const hasJob = prev.jobs.some(j => j.id === newJob.id)
+              if (!hasJob) return prev
+              return {
+                ...prev,
+                jobs: prev.jobs.map(j => 
+                  j.id === newJob.id 
+                    ? { ...j, status: newJob.status, errorMsg: newJob.error_message || undefined }
+                    : j
+                )
+              }
+            })
             
             let message = ''
             if (status === 'printed') {
@@ -679,6 +703,8 @@ export default function TablesPage() {
 
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0)
     const cartTotal = cartSubtotal * 1.05 // 5% flat tax
+    const targetTableNumber = selectedTable.number
+    const totalItemsCount = cart.reduce((s, c) => s + c.quantity, 0)
 
     try {
       // Create Order
@@ -784,20 +810,69 @@ export default function TablesPage() {
         })
       }
 
+      let insertedJobsList: any[] = []
       if (printJobsToInsert.length > 0) {
-        const { error: printJobsErr } = await supabase.from('print_jobs').insert(printJobsToInsert)
+        const { data: insertedJobs, error: printJobsErr } = await supabase
+          .from('print_jobs')
+          .insert(printJobsToInsert)
+          .select('id, printer_id, payload, status')
+        
         if (printJobsErr) throw printJobsErr
+        insertedJobsList = insertedJobs || []
       }
 
-      // Cleanup
+      // Cleanup Cart and View
       saveCartState([])
       setOrderSuccess(true)
       setIsCartOpen(false)
+      setShowKOTConfirm(false)
+      setViewMode('tables')
+      setSelectedTable(null)
+
+      // Open Live KOT Print Report modal
+      if (insertedJobsList.length > 0) {
+        setPrintReport({
+          isOpen: true,
+          orderId: newOrder.id,
+          tableName: 'Table',
+          tableNumber: String(targetTableNumber),
+          totalItems: totalItemsCount,
+          jobs: insertedJobsList.map((j: any) => {
+            const matchedP = printers?.find((p: any) => p.id === j.printer_id)
+            const count = j.payload?.items?.reduce((s: number, it: any) => s + (it.quantity || 1), 0) || 0
+            return {
+              id: j.id,
+              printerId: j.printer_id,
+              printerName: matchedP?.name || 'Printer',
+              printerType: matchedP?.type || 'kitchen',
+              status: j.status || 'pending',
+              itemsCount: count
+            }
+          })
+        })
+      } else {
+        // If no active printers were configured
+        setPrintReport({
+          isOpen: true,
+          orderId: newOrder.id,
+          tableName: 'Table',
+          tableNumber: String(targetTableNumber),
+          totalItems: totalItemsCount,
+          jobs: [{
+            id: 'no-printer',
+            printerId: 'none',
+            printerName: 'No Active Printer Found',
+            printerType: 'none',
+            status: 'failed',
+            errorMsg: 'No active printer configured in system',
+            itemsCount: totalItemsCount
+          }]
+        })
+      }
+
       setTimeout(() => {
         setOrderSuccess(false)
-        setViewMode('tables')
-        setSelectedTable(null)
-      }, 1000)
+      }, 2500)
     } catch (e: any) {
       const errMsg = e?.message || e?.error_description || (typeof e === 'object' ? JSON.stringify(e) : String(e))
       console.error('Order creation error details:', {
@@ -834,16 +909,24 @@ export default function TablesPage() {
       if (newQty <= 0) {
         await supabase.from('order_items').delete().eq('id', targetItem.id)
       } else {
-        await supabase.from('order_items').update({ quantity: newQty }).eq('id', targetItem.id)
+        const itemPrice = Number(targetItem.unit_price ?? targetItem.price_at_order ?? targetItem.menu_items?.price ?? 0)
+        await supabase.from('order_items').update({ 
+          quantity: newQty,
+          unit_price: itemPrice,
+          total_price: itemPrice * newQty
+        }).eq('id', targetItem.id)
       }
 
       const orderId = targetItem.order_id
       const { data: updatedItems } = await supabase
         .from('order_items')
-        .select('quantity, price_at_order')
+        .select('quantity, unit_price, price_at_order')
         .eq('order_id', orderId)
 
-      const newTotal = updatedItems?.reduce((sum: number, item: any) => sum + (item.price_at_order * item.quantity), 0) || 0
+      const newTotal = updatedItems?.reduce((sum: number, item: any) => {
+        const p = Number(item.unit_price ?? item.price_at_order ?? 0)
+        return sum + (p * item.quantity)
+      }, 0) || 0
       await supabase.from('orders').update({ total_amount: newTotal }).eq('id', orderId)
       await fetchActiveOrders(selectedTable.id)
     } catch (e) {
@@ -1019,7 +1102,7 @@ export default function TablesPage() {
     activeOrders.forEach(order => {
       order.order_items?.forEach((oi: any) => {
         const name = oi.menu_items?.name || 'Unknown'
-        const price = oi.price_at_order || 0
+        const price = Number(oi.unit_price ?? oi.price_at_order ?? oi.menu_items?.price ?? 0)
         const printer_type = oi.menu_items?.printer_type
         const existing = itemMap.get(name)
         if (existing) {
@@ -1233,7 +1316,14 @@ export default function TablesPage() {
               return (
                 <button
                   key={table.id}
-                  onClick={() => setSelectedTable(table)}
+                  onClick={() => {
+                    setSelectedTable(table)
+                    if (table.status === 'available') {
+                      setViewMode('menu')
+                    } else {
+                      setBillingMode(true)
+                    }
+                  }}
                   disabled={updatingTableId === table.id}
                   className={`flex flex-col justify-between p-3.5 rounded-2xl border transition-all active:scale-[0.95] text-left h-28 relative shadow-xs bg-background ${themeConfig.border}`}
                 >
@@ -1486,9 +1576,19 @@ export default function TablesPage() {
               <button
                 onClick={triggerSendKOT}
                 disabled={submittingOrder}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] px-5 py-2.5 rounded-xl flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="bg-orange-500 hover:bg-orange-600 text-white font-black text-xs px-5 py-3 rounded-xl flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-md shadow-orange-500/25"
               >
-                {submittingOrder ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Send KOT'}
+                {submittingOrder ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Printing KOT...</span>
+                  </>
+                ) : (
+                  <>
+                    <Flame className="w-4 h-4 text-white" />
+                    <span>Fire KOT</span>
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -1548,12 +1648,24 @@ export default function TablesPage() {
                   <span className="text-orange-500 font-mono text-sm">₹{cart.reduce((s,c)=>s+(c.menuItem.price*c.quantity),0).toFixed(0)}</span>
                 </div>
 
-                <button 
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-full py-3.5 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-black text-xs rounded-2xl active:scale-95 transition-all"
-                >
-                  Continue Adding Items
-                </button>
+                <div className="flex gap-2.5 pt-1">
+                  <button 
+                    onClick={() => setIsCartOpen(false)}
+                    className="flex-1 py-3 bg-zinc-150 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-black text-xs rounded-2xl active:scale-95 transition-all cursor-pointer"
+                  >
+                    + Add More
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsCartOpen(false)
+                      setShowKOTConfirm(true)
+                    }}
+                    className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black text-xs rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-orange-500/25"
+                  >
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Send KOT</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1748,7 +1860,7 @@ export default function TablesPage() {
                   )}
                 </div>
               ) : (
-                /* REGULAR CONTROL PANE */
+                /* DIRECT OPERATIONAL SUMMARY */
                 <div className="space-y-4">
                   <div className="space-y-2 shrink-0">
                     <button
@@ -1756,55 +1868,23 @@ export default function TablesPage() {
                       className="flex w-full items-center justify-center gap-2 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md shadow-orange-500/10 active:scale-97 transition-all cursor-pointer"
                     >
                       <ShoppingBag className="w-4 h-4 shrink-0" />
-                      Take Order (Menu)
+                      + Add More Items to Table
                     </button>
 
-                    {selectedTable.status !== 'available' && (
-                      <button
-                        onClick={() => setBillingMode(true)}
-                        className="flex w-full items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/15 text-indigo-500 font-black text-xs active:scale-97 transition-all cursor-pointer"
-                      >
-                        <Receipt className="w-4 h-4 shrink-0" />
-                        Compile Bill & Checkout
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setBillingMode(true)}
+                      className="flex w-full items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/15 text-indigo-500 font-black text-xs active:scale-97 transition-all cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4 shrink-0" />
+                      View Bill & Checkout
+                    </button>
                   </div>
 
-                  <span className="text-[8.5px] font-black text-zinc-400 uppercase tracking-widest block">Table Seating Status</span>
-                  
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { id: 'available', icon: CheckCircle, label: 'Mark Available', desc: 'Table is empty, clean, and ready for new guests' },
-                      { id: 'occupied', icon: Coffee, label: 'Mark Occupied', desc: 'Guests seated and actively taking orders' },
-                      { id: 'billing', icon: Receipt, label: 'Mark Billing', desc: 'Dining completed, requested checkout receipt' }
-                    ].map(statusItem => {
-                      const Icon = statusItem.icon
-                      const isMatch = selectedTable.status === statusItem.id
-                      const textColors = {
-                        available: 'text-green-600 border-green-500/20 bg-green-500/5',
-                        occupied: 'text-orange-600 border-orange-500/20 bg-orange-500/5',
-                        billing: 'text-blue-600 border-blue-500/20 bg-blue-500/5'
-                      }[statusItem.id]
-
-                      return (
-                        <button
-                          key={statusItem.id}
-                          onClick={() => triggerUpdateTableStatus(statusItem.id as any)}
-                          className={`flex items-center justify-between p-3 border rounded-2xl text-left active:scale-[0.97] transition-all cursor-pointer ${
-                            isMatch ? textColors : 'border-zinc-200/60 dark:border-zinc-800 bg-background hover:bg-zinc-50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Icon className="w-5 h-5 shrink-0" />
-                            <div>
-                              <h4 className="text-[10px] font-black leading-tight">{statusItem.label}</h4>
-                              <p className="text-[8.5px] text-zinc-400 dark:text-zinc-500 mt-0.5 leading-none">{statusItem.desc}</p>
-                            </div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
-                        </button>
-                      )
-                    })}
+                  <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-[10px] space-y-1 text-zinc-500">
+                    <span className="font-black text-foreground uppercase tracking-widest text-[9px] block">Automatic Table Lifecycle</span>
+                    <p>• Placing a KOT automatically marks the table as <span className="text-orange-500 font-bold">Occupied</span>.</p>
+                    <p>• Printing the receipt marks it as <span className="text-blue-500 font-bold">Billing</span>.</p>
+                    <p>• Clearing the table returns it to <span className="text-emerald-500 font-bold">Available</span>.</p>
                   </div>
                 </div>
               )}
@@ -1892,7 +1972,267 @@ export default function TablesPage() {
         </div>
       )}
 
-      {/* Print Job Toast Notification */}
+      {/* ────────────────────────────────────────────────────────
+          KOT SEND PRE-CONFIRMATION MODAL
+          ──────────────────────────────────────────────────────── */}
+      {showKOTConfirm && selectedTable && (
+        <div className="fixed inset-0 z-[105] flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-zinc-950/50 backdrop-blur-xs transition-opacity" 
+            onClick={() => !submittingOrder && setShowKOTConfirm(false)} 
+          />
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 flex items-center justify-center">
+                  <Flame className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                    Confirm & Send KOT
+                  </h3>
+                  <span className="text-[10px] text-zinc-400 font-bold block">
+                    Table T{selectedTable.number} • {cart.reduce((s, c) => s + c.quantity, 0)} Items
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => !submittingOrder && setShowKOTConfirm(false)}
+                disabled={submittingOrder}
+                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Items Summary */}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs">
+              {cart.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/60">
+                  <div className="flex items-center gap-2 flex-1 pr-2">
+                    <span className="text-[11px] font-black text-orange-500 font-mono w-5">
+                      {item.quantity}x
+                    </span>
+                    <div className="leading-tight">
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200 text-[11px] block">
+                        {item.menuItem.name}
+                      </span>
+                      {item.notes && (
+                        <span className="text-[9px] text-orange-400 font-bold block">
+                          📝 {item.notes}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-zinc-200/50 dark:bg-zinc-700/50 text-zinc-500 dark:text-zinc-400">
+                    {item.menuItem.printer_type || 'kitchen'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Target Printers Breakdown */}
+            <div className="p-2.5 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200/30 dark:border-orange-900/30 text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold">
+                <Printer className="w-3.5 h-3.5 text-orange-500" />
+                <span>Destination Printers:</span>
+              </div>
+              <span className="font-black text-orange-500 uppercase text-[9px]">
+                {Array.from(new Set(cart.map(c => c.menuItem.printer_type || 'kitchen'))).join(' & ')}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowKOTConfirm(false)}
+                disabled={submittingOrder}
+                className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Back to Edit
+              </button>
+              <button
+                onClick={handlePlaceOrder}
+                disabled={submittingOrder}
+                className="flex-[1.5] py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl text-xs font-black active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/25 disabled:opacity-50"
+              >
+                {submittingOrder ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Sending to Printer...</span>
+                  </>
+                ) : (
+                  <>
+                    <Flame className="w-4 h-4" />
+                    <span>Confirm & Fire KOT</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          LIVE PRINT REPORT & STATUS TRACKER MODAL
+          ──────────────────────────────────────────────────────── */}
+      {printReport && printReport.isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-xs transition-opacity" 
+            onClick={() => setPrintReport(null)} 
+          />
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
+                  printReport.jobs.every(j => j.status === 'printed')
+                    ? 'bg-emerald-500/10 text-emerald-500'
+                    : printReport.jobs.some(j => j.status === 'failed')
+                    ? 'bg-red-500/10 text-red-500'
+                    : 'bg-orange-500/10 text-orange-500 animate-pulse'
+                }`}>
+                  {printReport.jobs.every(j => j.status === 'printed') ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  ) : printReport.jobs.some(j => j.status === 'failed') ? (
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                  ) : (
+                    <Printer className="w-5 h-5 text-orange-500" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                    KOT Print Report
+                  </h3>
+                  <span className="text-[10px] text-zinc-400 font-bold block">
+                    Table T{printReport.tableNumber} • {printReport.totalItems} Items
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setPrintReport(null)}
+                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Overall Status Banner */}
+            <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
+              printReport.jobs.every(j => j.status === 'printed')
+                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                : printReport.jobs.some(j => j.status === 'failed')
+                ? 'bg-red-500/5 border-red-500/20 text-red-700 dark:text-red-400'
+                : 'bg-orange-500/5 border-orange-500/20 text-orange-700 dark:text-orange-400'
+            }`}>
+              <div className="shrink-0">
+                {printReport.jobs.every(j => j.status === 'printed') ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : printReport.jobs.some(j => j.status === 'failed') ? (
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                ) : (
+                  <Loader2 className="w-4 h-4 text-orange-500 animate-spin" />
+                )}
+              </div>
+              <div className="flex-1 text-left">
+                <span className="text-xs font-black block leading-none">
+                  {printReport.jobs.every(j => j.status === 'printed')
+                    ? 'All KOT Tickets Printed!'
+                    : printReport.jobs.some(j => j.status === 'failed')
+                    ? 'Print Error Occurred'
+                    : 'Sent to Printer — Printing...'}
+                </span>
+                <span className="text-[9.5px] font-bold text-zinc-500 dark:text-zinc-400 mt-1 block">
+                  {printReport.jobs.every(j => j.status === 'printed')
+                    ? 'Tickets have been cut and ready at chef stations.'
+                    : printReport.jobs.some(j => j.status === 'failed')
+                    ? 'One or more tickets failed. Check printer paper or network.'
+                    : 'Job dispatched to local thermal print server.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Destination Printer Jobs List */}
+            <div className="space-y-2">
+              <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block text-left">
+                Hardware Job Status
+              </span>
+              <div className="space-y-1.5">
+                {printReport.jobs.map((job, idx) => (
+                  <div key={job.id || idx} className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-150 dark:border-zinc-800/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                        job.status === 'printed'
+                          ? 'bg-emerald-500/10 text-emerald-600'
+                          : job.status === 'failed'
+                          ? 'bg-red-500/10 text-red-500'
+                          : 'bg-orange-500/10 text-orange-500'
+                      }`}>
+                        <Printer className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 block leading-tight">
+                          {job.printerName}
+                        </span>
+                        <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider block">
+                          {job.printerType} • {job.itemsCount} items
+                        </span>
+                        {job.errorMsg && (
+                          <span className="text-[8.5px] text-red-500 font-bold block mt-0.5">
+                            {job.errorMsg}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-2 py-1 rounded-full text-[8.5px] font-black uppercase tracking-wider ${
+                        job.status === 'printed'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                          : job.status === 'failed'
+                          ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                          : 'bg-orange-500/10 text-orange-500 border border-orange-500/20 animate-pulse'
+                      }`}>
+                        {job.status === 'printed'
+                          ? 'Printed'
+                          : job.status === 'failed'
+                          ? 'Failed'
+                          : 'In Queue'}
+                      </span>
+
+                      {job.status === 'failed' && job.id !== 'no-printer' && (
+                        <button
+                          onClick={async () => {
+                            await supabase
+                              .from('print_jobs')
+                              .update({ status: 'pending', attempts: 0, error_message: null })
+                              .eq('id', job.id)
+                            setPrintReport(prev => prev ? ({
+                              ...prev,
+                              jobs: prev.jobs.map(j => j.id === job.id ? { ...j, status: 'pending', errorMsg: undefined } : j)
+                            }) : null)
+                          }}
+                          className="px-2 py-1 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-lg text-[8.5px] font-black hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Dismiss Button */}
+            <button
+              onClick={() => setPrintReport(null)}
+              className="w-full py-3 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-black text-xs rounded-2xl active:scale-95 transition-all cursor-pointer"
+            >
+              Done & Return to Tables
+            </button>
+          </div>
+        </div>
+      )}
       {newJobToast && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border animate-in fade-in slide-in-from-top-4 duration-300 bg-white dark:bg-zinc-900 ${
           newJobToast.status === 'printed' 

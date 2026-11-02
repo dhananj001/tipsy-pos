@@ -34,6 +34,11 @@ export const listenerService = {
     // 5. Start background printer connection status checks
     startPrinterHeartbeat();
 
+    // 6. Fail-safe periodic polling queue every 10 seconds (in case WebSocket misses an INSERT)
+    setInterval(() => {
+      processPendingJobsQueue();
+    }, 10000);
+
     logger.success("All listener services are active and running!");
   }
 };

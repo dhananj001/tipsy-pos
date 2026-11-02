@@ -159,7 +159,7 @@ export default function OperationalFloorDashboard() {
       if (tablesData) {
         setTables(tablesData)
         if (!selectedTableId) {
-          const firstOccupied = tablesData.find(t => t.status === 'occupied' || t.status === 'billing')
+          const firstOccupied = (tablesData as any[]).find((t: any) => t.status === 'occupied' || t.status === 'billing')
           if (firstOccupied) {
             setSelectedTableId(firstOccupied.id)
           } else if (tablesData.length > 0) {
@@ -246,7 +246,7 @@ export default function OperationalFloorDashboard() {
         .gte('created_at', startOfDay.toISOString())
 
       if (completedSales) {
-        const total = completedSales.reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0)
+        const total = (completedSales as any[]).reduce((acc: number, curr: any) => acc + Number(curr.total_amount || 0), 0)
         setTodaySalesTotal(total)
       }
 

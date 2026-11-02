@@ -161,8 +161,18 @@ function renderKOT(printer, payload) {
     items = []
   } = payload;
 
-  const formattedTime = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const formattedDate = new Date(timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' });
+  const formattedTime = new Date(timestamp).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+  const formattedDate = new Date(timestamp).toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
 
   // Header Banner
   printer.alignCenter();
@@ -275,20 +285,21 @@ function renderBill(printer, payload) {
   const hasGst = gstItems.length > 0;
   const hasVat = vatItems.length > 0;
 
-  // Helper functions for formatting
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const formatDateTime = (isoString) => {
-    const date = new Date(isoString);
-    const m = months[date.getMonth()];
-    const d = String(date.getDate()).padStart(2, '0');
-    const y = date.getFullYear();
-    let hrs = date.getHours();
-    const mins = String(date.getMinutes()).padStart(2, '0');
-    const actualAmpm = hrs >= 12 ? 'PM' : 'AM';
-    hrs = hrs % 12;
-    hrs = hrs ? hrs : 12;
-    const hrsStr = String(hrs).padStart(2, '0');
-    return `${m} ${d} ${y} ${hrsStr}:${mins} ${actualAmpm}`;
+    const d = new Date(isoString);
+    const datePart = d.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    const timePart = d.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+    return `${datePart} ${timePart}`;
   };
 
   const formattedDateTime = formatDateTime(timestamp);
