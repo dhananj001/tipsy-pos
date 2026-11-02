@@ -293,34 +293,31 @@ export default function OperationalFloorDashboard() {
   useEffect(() => {
     loadDashboardData()
 
-    const interval = setInterval(() => {
-      loadDashboardData(true)
-    }, 15000)
+    // Realtime subscriptions handle instant updates. 
+    // We debounce updates so that multiple simultaneous changes (e.g. order + 5 order_items)
+    // coalesce into exactly ONE query execution rather than 6 rapid queries.
+    let debounceTimer: NodeJS.Timeout | null = null
+    const debouncedReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        loadDashboardData(true)
+      }, 350)
+    }
 
     if (profile?.restaurant_id) {
       const channel = supabase
         .channel('dashboard_realtime_ops')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` }, () => {
-          loadDashboardData(true)
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `restaurant_id=eq.${profile.restaurant_id}` }, () => {
-          loadDashboardData(true)
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${profile.restaurant_id}` }, () => {
-          loadDashboardData(true)
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'print_jobs', filter: `restaurant_id=eq.${profile.restaurant_id}` }, () => {
-          loadDashboardData(true)
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'print_jobs', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
         .subscribe()
 
       return () => {
-        clearInterval(interval)
+        if (debounceTimer) clearTimeout(debounceTimer)
         supabase.removeChannel(channel)
       }
     }
-
-    return () => clearInterval(interval)
   }, [loadDashboardData, profile?.restaurant_id, supabase])
 
   // --- Computations ---

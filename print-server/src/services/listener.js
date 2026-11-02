@@ -306,24 +306,34 @@ async function pingAllPrinters() {
     try {
       const result = await checkPrinterConnection(printer.ip_address, printer.port);
       
-      // Update DB with connection status
-      const { error } = await supabase
-        .from("printers")
-        .update({
-          connection_status: result.status,
-          connection_error: result.error,
-          last_connected_at: result.status === "online" ? new Date().toISOString() : (printer.last_connected_at || null)
-        })
-        .eq("id", id);
-        
-      if (error) {
-        if (error.code === "P0002" || error.message?.includes("does not exist") || error.message?.includes("column")) {
-          logger.warn(`Database schema does not support connection tracking columns yet. Please apply the SQL migration in supabase/migrations/20260712160000_printer_connection_status.sql. Printer [${printer.name}] is locally ${result.status.toUpperCase()}`);
+      // Only write to database if the status changed OR at least 60 seconds have elapsed (drastically cuts Disk I/O)
+      const statusChanged = printer.connection_status !== result.status || printer.connection_error !== result.error;
+      const lastPing = printer.last_db_sync || 0;
+      const shouldSync = statusChanged || (Date.now() - lastPing > 60000);
+
+      if (shouldSync) {
+        printer.last_db_sync = Date.now();
+        printer.connection_status = result.status;
+        printer.connection_error = result.error;
+
+        const { error } = await supabase
+          .from("printers")
+          .update({
+            connection_status: result.status,
+            connection_error: result.error,
+            last_connected_at: result.status === "online" ? new Date().toISOString() : (printer.last_connected_at || null)
+          })
+          .eq("id", id);
+          
+        if (error) {
+          if (error.code === "P0002" || error.message?.includes("does not exist") || error.message?.includes("column")) {
+            logger.warn(`Database schema does not support connection tracking columns yet. Printer [${printer.name}] is locally ${result.status.toUpperCase()}`);
+          } else {
+            logger.error(`Failed to update status in DB for printer ${printer.name}:`, error);
+          }
         } else {
-          logger.error(`Failed to update status in DB for printer ${printer.name}:`, error);
+          logger.info(`Printer [${printer.name}] health status check: ${result.status.toUpperCase()} ${result.error ? `(${result.error})` : ""}`);
         }
-      } else {
-        logger.info(`Printer [${printer.name}] health status check: ${result.status.toUpperCase()} ${result.error ? `(${result.error})` : ""}`);
       }
     } catch (err) {
       logger.error(`Error during health check for printer ${printer.name}:`, err);
