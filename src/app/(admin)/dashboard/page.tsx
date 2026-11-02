@@ -158,14 +158,11 @@ export default function OperationalFloorDashboard() {
 
       if (tablesData) {
         setTables(tablesData)
-        if (!selectedTableId) {
+        setSelectedTableId(prev => {
+          if (prev) return prev
           const firstOccupied = (tablesData as any[]).find((t: any) => t.status === 'occupied' || t.status === 'billing')
-          if (firstOccupied) {
-            setSelectedTableId(firstOccupied.id)
-          } else if (tablesData.length > 0) {
-            setSelectedTableId(tablesData[0].id)
-          }
-        }
+          return firstOccupied ? firstOccupied.id : (tablesData[0]?.id || null)
+        })
       }
 
       // B. Active Non-completed Orders with items
@@ -256,7 +253,7 @@ export default function OperationalFloorDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [profile?.restaurant_id, selectedTableId, supabase])
+  }, [profile?.restaurant_id, supabase])
 
   // 2. Fetch Menu & Categories once for in-line ordering modal
   useEffect(() => {
