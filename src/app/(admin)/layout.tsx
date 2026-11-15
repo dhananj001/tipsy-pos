@@ -21,7 +21,8 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Smartphone
 } from 'lucide-react'
 
 export default function AdminLayout({
@@ -130,6 +131,18 @@ export default function AdminLayout({
               </Link>
             )
           })}
+
+          {/* Quick link in sidebar for mobile ordering */}
+          <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-900">
+            <Link
+              href="/captain/tables"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-all border border-amber-500/20"
+            >
+              <Smartphone className="h-4.5 w-4.5 shrink-0 text-amber-500" />
+              {!sidebarCollapsed && <span>Take Orders (Captain)</span>}
+            </Link>
+          </div>
         </nav>
 
         {/* Sidebar Footer User Info & Collapser */}
@@ -188,6 +201,17 @@ export default function AdminLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Quick Switch to Mobile Captain View for Orders */}
+            <Link
+              href="/captain/tables"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-xs font-bold transition-all active:scale-95 cursor-pointer min-h-[36px]"
+              title="Switch to Mobile Captain View to take table orders"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">Captain View</span>
+              <span className="sm:hidden">Captain</span>
+            </Link>
+
             {/* Premium Theme Switcher */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

@@ -4,7 +4,7 @@ import React, { useEffect } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Grid, ClipboardList, User, LogOut, Moon, Sun } from 'lucide-react'
+import { Grid, ClipboardList, User, LogOut, Moon, Sun, ArrowLeft, LayoutDashboard } from 'lucide-react'
 import { useTheme } from '@/providers/theme-provider'
 import { TipsyLogo } from '@/components/tipsy-logo'
 
@@ -55,10 +55,25 @@ export default function CaptainLayout({
         {/* Sleek Top Header */}
         <header className="flex h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] shrink-0 items-center justify-between border-b border-zinc-100 bg-background/85 px-4 backdrop-blur-md dark:border-zinc-900">
           <div className="flex items-center gap-3">
-            <TipsyLogo size={36} priority />
+            {/* If Manager or Admin, show quick 1-tap Return to Floor button */}
+            {(profile?.role === 'admin' || profile?.role === 'manager') ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold shadow-xs active:scale-95 transition-transform"
+                title="Return to Manager Dashboard"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </Link>
+            ) : (
+              <TipsyLogo size={36} priority />
+            )}
+            
             <div>
               <h1 className="text-sm font-bold tracking-tight text-foreground leading-none">Tipsy POS</h1>
-              <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-0.5">Captain Terminal</p>
+              <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-0.5">
+                {(profile?.role === 'admin' || profile?.role === 'manager') ? `${profile.role} (Ordering)` : 'Captain Terminal'}
+              </p>
             </div>
           </div>
 

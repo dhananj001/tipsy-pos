@@ -126,6 +126,10 @@ During live database inspection via the Supabase MCP server:
   * Added mobile-friendly bottom-sheet dialogs with swipe handles for Adding, Editing, and Deleting staff.
   * Multi-tenant security ensured: actions strictly scoped to the active tenant's `restaurant_id`.
 
+* **Two-Way Captain / Dashboard Switcher (Option A Implemented):**
+  * **Top Header & Sidebar Shortcut** ([`src/app/(admin)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/layout.tsx)): Added a 1-tap **"Captain View"** button in the header and sidebar. Managers on phone/tablet or stepping onto the floor can instantly open the fast handheld ordering terminal without logging out.
+  * **Return Navigation Pill** ([`src/app/(captain)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(captain)/layout.tsx)): When an `admin` or `manager` is inside the Captain terminal, a **"Dashboard"** button appears in the top header to instantly jump back to floor management. Standard `captain` profiles remain sandboxed without access to management routes.
+
 ---
 
 ## 5. Verification & Build Integrity
