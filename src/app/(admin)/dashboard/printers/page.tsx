@@ -88,7 +88,7 @@ export default function PrintersManagementPage() {
     try {
       const { data, error: fetchErr } = await supabase
         .from('printers')
-        .select('*')
+        .select('id, restaurant_id, name, ip_address, port, type, is_active, connection_status, connection_error, last_connected_at, created_at')
         .eq('restaurant_id', profile.restaurant_id)
         .order('created_at', { ascending: false })
 
@@ -110,7 +110,7 @@ export default function PrintersManagementPage() {
     try {
       const { data, error: jobsErr } = await supabase
         .from('print_jobs')
-        .select('*')
+        .select('id, restaurant_id, printer_id, payload, status, attempts, error_message, created_at')
         .eq('restaurant_id', profile.restaurant_id)
         .order('created_at', { ascending: false })
         .limit(20)

@@ -81,6 +81,7 @@ export default function AdminOrdersPage() {
         `)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
+        .limit(100)
 
       if (fetchErr) throw fetchErr
       setOrders(data as unknown as Order[])

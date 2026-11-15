@@ -128,6 +128,7 @@ export default function GroupedBillsHistoryPage() {
         .neq('status', 'cancelled')
         .gte('created_at', startOfToday)
         .order('created_at', { ascending: false })
+        .limit(200)
 
       if (fetchErr) throw fetchErr
       setBills(data as unknown as Order[])

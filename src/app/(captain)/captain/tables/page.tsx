@@ -464,7 +464,7 @@ export default function TablesPage() {
     fetchMenuData()
 
     const channel = supabase
-      .channel('public:tables')
+      .channel(`public:tables:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${profile.restaurant_id}` },
@@ -490,7 +490,7 @@ export default function TablesPage() {
       .subscribe()
 
     const ordersChannel = supabase
-      .channel('public:orders')
+      .channel(`public:orders:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` },
@@ -585,7 +585,7 @@ export default function TablesPage() {
     fetchPrintMonitorData()
 
     const printersChannel = supabase
-      .channel('realtime_printers_monitor')
+      .channel(`realtime_printers_monitor_${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'printers', filter: `restaurant_id=eq.${profile.restaurant_id}` },
@@ -594,7 +594,7 @@ export default function TablesPage() {
       .subscribe()
 
     const jobsChannel = supabase
-      .channel('realtime_jobs_monitor')
+      .channel(`realtime_jobs_monitor_${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'print_jobs', filter: `restaurant_id=eq.${profile.restaurant_id}` },

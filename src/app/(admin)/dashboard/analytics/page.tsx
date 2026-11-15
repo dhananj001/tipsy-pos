@@ -176,7 +176,7 @@ export default function AnalyticsDashboard() {
     const supabaseClient = createClient()
     // Listen for new payments or orders to update real-time statistics
     const channel = supabaseClient
-      .channel('admin:analytics')
+      .channel(`admin:analytics:${restaurantId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'payments', filter: `restaurant_id=eq.${restaurantId}` },

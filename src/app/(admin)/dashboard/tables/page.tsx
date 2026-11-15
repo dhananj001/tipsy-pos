@@ -104,7 +104,7 @@ export default function AdminTablesPage() {
     try {
       const { data, error: fetchError } = await supabase
         .from('tables')
-        .select('*')
+        .select('id, number, capacity, status, restaurant_id')
         .eq('restaurant_id', profile.restaurant_id)
         .order('number', { ascending: true })
 

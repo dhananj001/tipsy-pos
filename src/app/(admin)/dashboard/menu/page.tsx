@@ -84,7 +84,7 @@ export default function MenuManagementPage() {
       // Fetch Categories
       const { data: catData, error: catError } = await supabase
         .from('menu_categories')
-        .select('*')
+        .select('id, name, sort_order, restaurant_id')
         .eq('restaurant_id', profile.restaurant_id)
         .order('sort_order', { ascending: true })
 
@@ -93,7 +93,7 @@ export default function MenuManagementPage() {
       // Fetch Items
       const { data: itemData, error: itemError } = await supabase
         .from('menu_items')
-        .select('*')
+        .select('id, name, description, price, is_available, printer_type, category_id, restaurant_id')
         .eq('restaurant_id', profile.restaurant_id)
         .order('name', { ascending: true })
 
