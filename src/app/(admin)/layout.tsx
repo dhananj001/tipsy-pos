@@ -238,7 +238,7 @@ export default function AdminLayout({
         </header>
 
         {/* Dynamic Workspace Scroll Container */}
-        <main className="flex-1 overflow-hidden p-0 bg-zinc-50 dark:bg-zinc-950/20">
+        <main className="flex-1 overflow-y-auto p-0 bg-zinc-50 dark:bg-zinc-950/20">
           {children}
         </main>
       </div>

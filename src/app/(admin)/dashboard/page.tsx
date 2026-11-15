@@ -453,7 +453,7 @@ export default function OperationalFloorDashboard() {
       try {
         const { data: rData } = await supabase.from('restaurants').select('name').eq('id', profile.restaurant_id).single()
         if (rData?.name) restaurantName = rData.name
-      } catch (e) {}
+      } catch (e) { }
 
       const itemsByPrinter: Record<string, typeof modalCart> = {}
       modalCart.forEach(c => {
@@ -797,12 +797,12 @@ export default function OperationalFloorDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
-      
+    <div className="flex flex-col min-h-full w-full bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
+
       {/* ────────────────────────────────────────────────────────
           1. TOP METRICS STRIP (Responsive Pulse + Live Hardware Indicators)
           ──────────────────────────────────────────────────────── */}
-      <header className="shrink-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 shadow-xs select-none">
+      <header className="shrink-0 sticky top-0 z-30 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xs px-3 sm:px-4 py-2 flex items-center justify-between gap-3 shadow-xs select-none">
         {/* Left: Title + Inline Metrics */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className="shrink-0">
@@ -843,16 +843,16 @@ export default function OperationalFloorDashboard() {
         {/* Right: Actions & Hardware */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Printer Health Dots */}
-          <div 
+          <div
             className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold"
             title={printers.map(p => `${p.name}: ${p.connection_status}`).join('\n')}
           >
             <Printer className="w-3 h-3 text-zinc-400 shrink-0" />
             <div className="flex items-center gap-1">
               {printers.map(p => (
-                <span 
-                  key={p.id} 
-                  className={`w-1.5 h-1.5 rounded-full ${p.connection_status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                <span
+                  key={p.id}
+                  className={`w-1.5 h-1.5 rounded-full ${p.connection_status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`}
                 />
               ))}
             </div>
@@ -887,15 +887,15 @@ export default function OperationalFloorDashboard() {
       {/* ────────────────────────────────────────────────────────
           2. MAIN FLOOR LAYOUT (Floor Grid on Left, Live Table POS Inspector on Right)
           ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
-        
+      <div className="flex-1 flex flex-col lg:flex-row relative">
+
         {/* LEFT AREA: Interactive Tables Floor Plan */}
-        <section className={`flex-1 flex flex-col p-3 sm:p-6 overflow-hidden ${
+        <section className={`flex-1 flex flex-col p-3 sm:p-5 ${
           selectedTable ? 'hidden lg:flex' : 'flex'
         }`}>
           
           {/* Filter Bar (Horizontal scroll on phone with native segmented pills) */}
-          <div className="flex items-center justify-between pb-2.5 sm:pb-4 gap-2 select-none">
+          <div className="flex items-center justify-between pb-2.5 sm:pb-3 gap-2 select-none">
             <div className="flex items-center gap-1.5 p-1 bg-zinc-200/70 dark:bg-zinc-900 rounded-xl overflow-x-auto scrollbar-none w-full sm:w-auto">
               {[
                 { id: 'all', label: `All (${tables.length})`, dot: null },
@@ -906,11 +906,10 @@ export default function OperationalFloorDashboard() {
                 <button
                   key={f.id}
                   onClick={() => setFilterSection(f.id as any)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 ${
-                    filterSection === f.id
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 ${filterSection === f.id
                       ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
                       : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
-                  }`}
+                    }`}
                 >
                   {f.dot && <span className={`w-2 h-2 rounded-full ${f.dot}`} />}
                   <span>{f.label}</span>
@@ -933,12 +932,12 @@ export default function OperationalFloorDashboard() {
           </div>
 
           {/* Tables Grid */}
-          <div className="flex-1 overflow-y-auto pr-0 sm:pr-1">
+          <div className="flex-1">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1920px]:grid-cols-6 gap-2 sm:gap-2.5 2xl:gap-3">
               {filteredTables.map(t => {
                 const isSelected = selectedTableId === t.id
                 const tableOrders = activeOrders.filter(o => o.table_id === t.id)
-                
+
                 // Item sum
                 let runningAmount = 0
                 let itemsCount = 0
@@ -957,24 +956,21 @@ export default function OperationalFloorDashboard() {
                   <button
                     key={t.id}
                     onClick={() => setSelectedTableId(t.id)}
-                    className={`flex flex-col p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-[0.98] cursor-pointer relative overflow-hidden select-none ${
-                      isSelected
+                    className={`flex flex-col p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-[0.98] cursor-pointer relative overflow-hidden select-none ${isSelected
                         ? 'ring-2 ring-amber-500 border-amber-500 shadow-md'
                         : 'hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xs'
-                    } ${
-                      isOccupied
+                      } ${isOccupied
                         ? 'border-orange-500/50 bg-orange-500/[0.04]'
                         : isBilling
-                        ? 'border-blue-500/50 bg-blue-500/[0.04]'
-                        : 'border-zinc-200/80 dark:border-zinc-800'
-                    }`}
+                          ? 'border-blue-500/50 bg-blue-500/[0.04]'
+                          : 'border-zinc-200/80 dark:border-zinc-800'
+                      }`}
                   >
                     {/* Top Row: Table Name + Capacity */}
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          isOccupied ? 'bg-orange-500 animate-pulse' : isBilling ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'
-                        }`} />
+                        <span className={`w-2 h-2 rounded-full ${isOccupied ? 'bg-orange-500 animate-pulse' : isBilling ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'
+                          }`} />
                         <span className="text-sm font-black text-zinc-900 dark:text-white leading-none">
                           T{t.number}
                         </span>
@@ -1005,9 +1001,8 @@ export default function OperationalFloorDashboard() {
 
                     {/* Bottom Pill */}
                     <div className="w-full pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[9px]">
-                      <span className={`font-black uppercase tracking-wider ${
-                        isOccupied ? 'text-orange-600' : isBilling ? 'text-blue-600' : 'text-emerald-600'
-                      }`}>
+                      <span className={`font-black uppercase tracking-wider ${isOccupied ? 'text-orange-600' : isBilling ? 'text-blue-600' : 'text-emerald-600'
+                        }`}>
                         {t.status}
                       </span>
                       {isSelected ? (
@@ -1024,7 +1019,7 @@ export default function OperationalFloorDashboard() {
 
           {/* BOTTOM STRIP: Real-Time KOT & Print Server Log
               (On mobile: Collapsed into a floating status pill to avoid pushing the grid; expandable on tap) */}
-          
+
           {/* Desktop Queue Strip */}
           <div className="hidden lg:block mt-4 pt-3 border-t border-zinc-200/80 dark:border-zinc-800 shrink-0 select-none">
             <div className="flex items-center justify-between pb-2">
@@ -1063,13 +1058,12 @@ export default function OperationalFloorDashboard() {
                       </span>
                     </div>
 
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                      isPrinted
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isPrinted
                         ? 'bg-emerald-500/10 text-emerald-600'
                         : isPending
-                        ? 'bg-amber-500/10 text-amber-600 animate-pulse'
-                        : 'bg-red-500/10 text-red-600'
-                    }`}>
+                          ? 'bg-amber-500/10 text-amber-600 animate-pulse'
+                          : 'bg-red-500/10 text-red-600'
+                      }`}>
                       {job.status}
                     </span>
                   </div>
@@ -1106,15 +1100,15 @@ export default function OperationalFloorDashboard() {
             (Full screen on mobile when a table is active, with back navigation.
              Compact responsive width: 330px on laptop, 370px on 1080p, 410px on 2K/4K)
             ──────────────────────────────────────────────────────── */}
-        <aside className={`border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none transition-[width] duration-200 ${
+        <aside className={`border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none transition-[width] duration-200 lg:sticky lg:top-12 lg:h-[calc(100vh-6.5rem)] ${
           selectedTable 
             ? 'w-full lg:w-[330px] xl:w-[370px] 2xl:w-[410px] flex-1 lg:flex-none flex' 
             : 'hidden lg:flex lg:w-[330px] xl:w-[370px] 2xl:w-[410px]'
-        }`}>
-          
+          }`}>
+
           {selectedTable ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-              
+
               {/* Table Header with Mobile Back Button */}
               <div className="px-3.5 py-2 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/20 shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -1135,9 +1129,8 @@ export default function OperationalFloorDashboard() {
                       Table T{selectedTable.number}
                     </h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`text-[9px] font-black uppercase tracking-wider ${
-                        selectedTable.status === 'occupied' ? 'text-orange-600' : selectedTable.status === 'billing' ? 'text-blue-600' : 'text-emerald-600'
-                      }`}>
+                      <span className={`text-[9px] font-black uppercase tracking-wider ${selectedTable.status === 'occupied' ? 'text-orange-600' : selectedTable.status === 'billing' ? 'text-blue-600' : 'text-emerald-600'
+                        }`}>
                         {selectedTable.status}
                       </span>
                       <span className="text-zinc-300 dark:text-zinc-700">•</span>
@@ -1391,7 +1384,7 @@ export default function OperationalFloorDashboard() {
       {isOrderModalOpen && selectedTable && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-zinc-950/70 backdrop-blur-xs select-none animate-in fade-in duration-200">
           <div className="w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl h-[94vh] sm:h-[88vh] 2xl:h-[82vh] bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
-            
+
             {/* Modal Header */}
             <div className="p-3 sm:p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-950/30">
               <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1416,10 +1409,10 @@ export default function OperationalFloorDashboard() {
 
             {/* Modal Main Area (Responsive: Stack on mobile, Split on desktop) */}
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-              
+
               {/* Menu Browser */}
               <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800">
-                
+
                 {/* Search Bar */}
                 <div className="relative mb-2.5 shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -1436,11 +1429,10 @@ export default function OperationalFloorDashboard() {
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 scrollbar-none shrink-0">
                   <button
                     onClick={() => setSelectedCategoryId('all')}
-                    className={`px-3 py-1 rounded-lg text-[10px] font-black shrink-0 transition-colors cursor-pointer ${
-                      selectedCategoryId === 'all'
+                    className={`px-3 py-1 rounded-lg text-[10px] font-black shrink-0 transition-colors cursor-pointer ${selectedCategoryId === 'all'
                         ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                    }`}
+                      }`}
                   >
                     All Items ({menuItems.length})
                   </button>
@@ -1448,11 +1440,10 @@ export default function OperationalFloorDashboard() {
                     <button
                       key={c.id}
                       onClick={() => setSelectedCategoryId(c.id)}
-                      className={`px-3 py-1 rounded-lg text-[10px] font-black shrink-0 transition-colors cursor-pointer ${
-                        selectedCategoryId === c.id
+                      className={`px-3 py-1 rounded-lg text-[10px] font-black shrink-0 transition-colors cursor-pointer ${selectedCategoryId === c.id
                           ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
-                      }`}
+                        }`}
                     >
                       {c.name}
                     </button>
@@ -1469,11 +1460,10 @@ export default function OperationalFloorDashboard() {
                       return (
                         <div
                           key={item.id}
-                          className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${
-                            qty > 0
+                          className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${qty > 0
                               ? 'border-amber-500/50 bg-amber-500/[0.04]'
                               : 'border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/60'
-                          }`}
+                            }`}
                         >
                           <div>
                             <div className="flex items-start justify-between gap-1">
@@ -1659,11 +1649,10 @@ export default function OperationalFloorDashboard() {
                       key={cap}
                       type="button"
                       onClick={() => setNewTableCapacity(cap)}
-                      className={`py-2 rounded-xl text-xs font-black border transition-all ${
-                        newTableCapacity === cap
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${newTableCapacity === cap
                           ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500'
                           : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400'
-                      }`}
+                        }`}
                     >
                       {cap} Pax
                     </button>
@@ -1726,11 +1715,10 @@ export default function OperationalFloorDashboard() {
                       key={cap}
                       type="button"
                       onClick={() => setEditTableCapacity(cap)}
-                      className={`py-2 rounded-xl text-xs font-black border transition-all ${
-                        editTableCapacity === cap
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${editTableCapacity === cap
                           ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500'
                           : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400'
-                      }`}
+                        }`}
                     >
                       {cap} Pax
                     </button>
@@ -1784,7 +1772,7 @@ export default function OperationalFloorDashboard() {
           ──────────────────────────────────────────────────────── */}
       {isKOTDrawerOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 animate-in fade-in duration-150 select-none">
-          <div 
+          <div
             className="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs"
             onClick={() => setIsKOTDrawerOpen(false)}
           />
@@ -1843,13 +1831,12 @@ export default function OperationalFloorDashboard() {
                         </span>
                       </div>
 
-                      <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md ${
-                        isPrinted
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md ${isPrinted
                           ? 'bg-emerald-500/10 text-emerald-600'
                           : isPending
-                          ? 'bg-amber-500/10 text-amber-600 animate-pulse'
-                          : 'bg-red-500/10 text-red-600'
-                      }`}>
+                            ? 'bg-amber-500/10 text-amber-600 animate-pulse'
+                            : 'bg-red-500/10 text-red-600'
+                        }`}>
                         {job.status}
                       </span>
                     </div>
