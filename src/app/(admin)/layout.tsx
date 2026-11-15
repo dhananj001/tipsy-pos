@@ -14,6 +14,7 @@ import {
   Printer,
   Users,
   TrendingUp,
+  Receipt,
   LogOut,
   Sun,
   Moon,
@@ -60,9 +61,8 @@ export default function AdminLayout({
 
   const menuItems = [
     { label: 'Restaurant Floor', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Table Layout', href: '/dashboard/tables', icon: Grid },
     { label: 'Menu Editor', href: '/dashboard/menu', icon: Utensils },
-    { label: 'Live Orders', href: '/dashboard/orders', icon: ClipboardList },
+    { label: 'Bills & Audit', href: '/dashboard/orders', icon: Receipt },
     { label: 'Printers', href: '/dashboard/printers', icon: Printer },
     { label: 'Staff Management', href: '/dashboard/staff', icon: Users },
     { label: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },

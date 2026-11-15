@@ -87,6 +87,18 @@ During live database inspection via the Supabase MCP server:
   ```
 * Once an order is settled or cancelled, the table automatically checks for remaining open orders and transitions to `available`.
 
+### C. Consolidation of Redundant Screens (Single Operational Pane of Glass)
+* **Floor-Centric POS Architecture:** 
+  * Deprecated the redundant `/dashboard/tables` screen. The unified Restaurant Floor (`/dashboard`) now handles table seating, active orders, billing, bill generation, and table lifecycle.
+  * Added instant floor-level table management: **"+ Add Table"** button in header, in-line capacity editing, and safe deletion of vacant tables.
+  * Automatic seamless client-side redirect installed at `/dashboard/tables` pointing to `/dashboard`.
+* **Sidebar Modernization (`src/app/(admin)/layout.tsx`):**
+  * Removed duplicate "Table Layout" navigation item.
+  * Rebranded "Live Orders" to **"Bills & Audit"** (`/dashboard/orders`), transforming it into an auditing archive and duplicate reprint station.
+* **Repurposed `/dashboard/orders/page.tsx` into Dedicated Bills & Audit Trail:**
+  * Displays finalized and active bills with date filtering (Today vs All Recent), search by Bill #, Table, or Dish, and payment method audit.
+  * Added one-click **"Reprint Thermal Bill"** that pushes an authenticated duplicate bill payload straight to the counter printer via `print_jobs`.
+
 ---
 
 ## 5. Verification & Build Integrity

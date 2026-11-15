@@ -36,7 +36,9 @@ import {
   Send,
   Edit2,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Settings,
+  PlusCircle
 } from 'lucide-react'
 
 interface TableData {
@@ -141,6 +143,15 @@ export default function OperationalFloorDashboard() {
   // In-line Editing of existing items
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingNotesText, setEditingNotesText] = useState('')
+
+  // Table Management Modals (Floor-level Add / Edit)
+  const [isAddTableOpen, setIsAddTableOpen] = useState(false)
+  const [newTableNumber, setNewTableNumber] = useState<string>('')
+  const [newTableCapacity, setNewTableCapacity] = useState<number>(4)
+  const [tableModalSaving, setTableModalSaving] = useState(false)
+
+  const [editingTable, setEditingTable] = useState<TableData | null>(null)
+  const [editTableCapacity, setEditTableCapacity] = useState<number>(4)
 
   // 1. Fetch live data
   const loadDashboardData = useCallback(async (isSilent = false) => {
@@ -679,6 +690,108 @@ export default function OperationalFloorDashboard() {
     }
   }
 
+  // 10. Table Management Handlers (Directly from Floor)
+  const handleCreateTable = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const restaurantId = profile?.restaurant_id
+    if (!restaurantId) return
+
+    const num = parseInt(newTableNumber.trim(), 10)
+    if (isNaN(num) || num <= 0) {
+      alert('Please enter a valid table number (e.g. 1, 2, 10).')
+      return
+    }
+
+    if (tables.some(t => t.number === num)) {
+      alert(`Table T${num} already exists! Please choose another number.`)
+      return
+    }
+
+    setTableModalSaving(true)
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .insert({
+          restaurant_id: restaurantId,
+          number: num,
+          table_number: String(num),
+          capacity: Number(newTableCapacity) || 4,
+          status: 'available',
+          is_active: true
+        })
+
+      if (error) throw error
+
+      setActionSuccessMsg(`Table T${num} created successfully!`)
+      setTimeout(() => setActionSuccessMsg(null), 3000)
+      setIsAddTableOpen(false)
+      setNewTableNumber('')
+      setNewTableCapacity(4)
+      loadDashboardData(true)
+    } catch (err: any) {
+      alert(`Create Table Failed: ${err.message}`)
+    } finally {
+      setTableModalSaving(false)
+    }
+  }
+
+  const handleUpdateTable = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTable) return
+
+    setTableModalSaving(true)
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .update({
+          capacity: Number(editTableCapacity) || 4
+        })
+        .eq('id', editingTable.id)
+
+      if (error) throw error
+
+      setActionSuccessMsg(`Table T${editingTable.number} updated!`)
+      setTimeout(() => setActionSuccessMsg(null), 3000)
+      setEditingTable(null)
+      loadDashboardData(true)
+    } catch (err: any) {
+      alert(`Update Table Failed: ${err.message}`)
+    } finally {
+      setTableModalSaving(false)
+    }
+  }
+
+  const handleDeleteTable = async (table: TableData) => {
+    if (table.status !== 'available') {
+      alert(`Cannot delete Table T${table.number} because it is currently ${table.status}. Please settle or clear it first.`)
+      return
+    }
+
+    if (!confirm(`Are you sure you want to permanently remove Table T${table.number}?`)) return
+
+    setActionLoading(true)
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .delete()
+        .eq('id', table.id)
+
+      if (error) throw error
+
+      if (selectedTableId === table.id) {
+        setSelectedTableId(null)
+      }
+      setEditingTable(null)
+      setActionSuccessMsg(`Table T${table.number} removed.`)
+      setTimeout(() => setActionSuccessMsg(null), 3000)
+      loadDashboardData(true)
+    } catch (err: any) {
+      alert(`Delete Table Failed: ${err.message}`)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
       
@@ -737,6 +850,20 @@ export default function OperationalFloorDashboard() {
               ))}
             </div>
           </div>
+
+          {/* Add Table Button */}
+          <button
+            onClick={() => {
+              setNewTableNumber(String((tables.length > 0 ? Math.max(...tables.map(t => t.number)) : 0) + 1))
+              setNewTableCapacity(4)
+              setIsAddTableOpen(true)
+            }}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer shrink-0"
+            title="Add a new dining table to the floor"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Add Table</span>
+          </button>
 
           {/* Manual Refresh Button */}
           <button
@@ -980,17 +1107,30 @@ export default function OperationalFloorDashboard() {
                   </div>
                 </div>
 
-                {/* Direct Action: Add Items to this table */}
-                <button
-                  onClick={() => {
-                    setModalCart([])
-                    setIsOrderModalOpen(true)
-                  }}
-                  className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Items</span>
-                </button>
+                {/* Actions: Edit Table Config & Add Items */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      setEditingTable(selectedTable)
+                      setEditTableCapacity(selectedTable.capacity)
+                    }}
+                    className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
+                    title={`Edit Table T${selectedTable.number} Settings`}
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setModalCart([])
+                      setIsOrderModalOpen(true)
+                    }}
+                    className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Items</span>
+                  </button>
+                </div>
               </div>
 
               {/* Action Success / Error Notifications */}
@@ -1432,6 +1572,178 @@ export default function OperationalFloorDashboard() {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          4. ADD TABLE MODAL (FLOOR MANAGEMENT)
+          ──────────────────────────────────────────────────────── */}
+      {isAddTableOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs"
+            onClick={() => setIsAddTableOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white">Add Dining Table</h3>
+              </div>
+              <button
+                onClick={() => setIsAddTableOpen(false)}
+                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTable} className="pt-4 space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1.5">
+                  Table Number
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-mono font-black text-zinc-500">T</span>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newTableNumber}
+                    onChange={(e) => setNewTableNumber(e.target.value)}
+                    placeholder="e.g. 5"
+                    className="flex-1 px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-bold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1.5">
+                  Seating Capacity (Guests)
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[2, 4, 6, 8].map(cap => (
+                    <button
+                      key={cap}
+                      type="button"
+                      onClick={() => setNewTableCapacity(cap)}
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${
+                        newTableCapacity === cap
+                          ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500'
+                          : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {cap} Pax
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTableOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={tableModalSaving}
+                  className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {tableModalSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Create Table'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          5. EDIT TABLE SETTINGS MODAL
+          ──────────────────────────────────────────────────────── */}
+      {editingTable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs"
+            onClick={() => setEditingTable(null)}
+          />
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white">Table T{editingTable.number} Settings</h3>
+              </div>
+              <button
+                onClick={() => setEditingTable(null)}
+                className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTable} className="pt-4 space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1.5">
+                  Update Seating Capacity
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[2, 4, 6, 8].map(cap => (
+                    <button
+                      key={cap}
+                      type="button"
+                      onClick={() => setEditTableCapacity(cap)}
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${
+                        editTableCapacity === cap
+                          ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500'
+                          : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {cap} Pax
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl space-y-1 border border-zinc-100 dark:border-zinc-800">
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-400">Current Status</span>
+                  <span className="font-bold capitalize text-zinc-700 dark:text-zinc-300">{editingTable.status}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTable(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={tableModalSaving}
+                    className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {tableModalSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+
+                {editingTable.status === 'available' && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTable(editingTable)}
+                    className="w-full py-2 rounded-xl border border-red-200 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete Table
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}
