@@ -130,6 +130,24 @@ During live database inspection via the Supabase MCP server:
   * **Top Header & Sidebar Shortcut** ([`src/app/(admin)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/layout.tsx)): Added a 1-tap **"Captain View"** button in the header and sidebar. Managers on phone/tablet or stepping onto the floor can instantly open the fast handheld ordering terminal without logging out.
   * **Return Navigation Pill** ([`src/app/(captain)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(captain)/layout.tsx)): When an `admin` or `manager` is inside the Captain terminal, a **"Dashboard"** button appears in the top header to instantly jump back to floor management. Standard `captain` profiles remain sandboxed without access to management routes.
 
+* **Native Mobile Floor View Polish (`src/app/(admin)/dashboard/page.tsx` & `src/app/(admin)/layout.tsx`):**
+  * **Header Shell De-cluttering:** Shortened to `h-14` on mobile with a compact live server pulse dot rather than a text-heavy banner.
+  * **Single-Row Floor Metrics:** Compacted the 2-tier header into a slim, horizontal summary strip with color-coded pills (`Occupied`, `Active`, `Settled`).
+  * **Clean Segmented Filter Strip:** Merged status dots into the filter pills (`All (12)`, `🟢 Free (10)`, `🟠 Seated (2)`, `🔵 Billing (0)`) and removed the redundant duplicate legend row.
+  * **High-Density Table Tiles:** Compacted 2-column mobile cards with tactile touch feedback (`active:scale-[0.97]`), clear table numbers, running subtotals, and item counts.
+  * **On-Demand KOT Print Queue Drawer:** Print queue no longer clutters the vertical scrolling space on mobile; replaced with a slim bottom action pill that opens an interactive slide-up bottom sheet drawer. Desktop view remains wide and persistent.
+
+* **Fluid Desktop Responsiveness (`src/app/(admin)/dashboard/page.tsx`):**
+  * **Adaptive Table Floor Matrix:** Tables dynamically adapt across screen sizes: `2` cols on mobile → `3` on tablet → `3` on 13" laptops (with inspector open) → `4` on 1080p → `5` on 1440p 2K → `6` on 4K/ultrawide displays.
+  * **Dynamic POS Inspector Width:** The live table inspector scales smoothly: `w-96` (384px) on laptops, `w-[410px]` on 1080p, and `w-[460px]` on 1440p/2K+.
+  * **Scalable In-Line Ordering Modal:** The floor ordering modal expands proportionally up to `xl:max-w-6xl` with menu item grids adjusting from 2 up to 5 columns.
+
+* **Viewport Calibration & Ergonomic Density Scaling (`src/app/(admin)/dashboard/page.tsx` & `layout.tsx`):**
+  * **Viewport Locking (100vh):** Updated `<main>` in `layout.tsx` to `h-full overflow-hidden p-0`, removing double page scrollbars. Both the interactive tables grid and the POS ticket inspector scroll independently within the fixed viewport.
+  * **Compact Table Cards:** Reduced card height and vertical padding (`min-h-[30px]`, tighter `p-2.5 sm:p-3`), removing excess whitespace and replicating the clean look of a zoomed-out view.
+  * **Slimmer POS Inspector Drawer:** Adjusted width from 400px–460px down to `330px` (laptops) and `370px` (1080p), providing more breathing room for the floor matrix.
+  * **Compact Receipt Itemization:** Running table dishes, quantity controls (`- 1 +`), inline notes, and settlement actions (`Cash`, `UPI`, `Card`) now stay pinned and visible without requiring vertical scrolling on standard desktop resolutions.
+
 ---
 
 ## 5. Verification & Build Integrity

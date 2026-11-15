@@ -154,6 +154,9 @@ export default function OperationalFloorDashboard() {
   const [editingTable, setEditingTable] = useState<TableData | null>(null)
   const [editTableCapacity, setEditTableCapacity] = useState<number>(4)
 
+  // Mobile KOT Queue Bottom Sheet
+  const [isKOTDrawerOpen, setIsKOTDrawerOpen] = useState(false)
+
   // 1. Fetch live data
   const loadDashboardData = useCallback(async (isSilent = false) => {
     const restaurantId = profile?.restaurant_id
@@ -794,60 +797,63 @@ export default function OperationalFloorDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
       
       {/* ────────────────────────────────────────────────────────
           1. TOP METRICS STRIP (Responsive Pulse + Live Hardware Indicators)
           ──────────────────────────────────────────────────────── */}
-      <header className="shrink-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs select-none">
-        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
-          <div>
-            <span className="text-[10px] font-black tracking-widest uppercase text-zinc-400 block leading-tight">Live Operations</span>
-            <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-white leading-tight flex items-center gap-2">
-              Restaurant Floor
-              {refreshing && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
+      <header className="shrink-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 px-3 sm:px-4 py-2 flex items-center justify-between gap-3 shadow-xs select-none">
+        {/* Left: Title + Inline Metrics */}
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="shrink-0">
+            <span className="text-[9px] font-black tracking-widest uppercase text-zinc-400 block leading-tight">Floor Operations</span>
+            <h1 className="text-sm sm:text-base font-black tracking-tight text-zinc-900 dark:text-white leading-tight flex items-center gap-1.5">
+              Floor Plan
+              {refreshing && <Loader2 className="w-3 h-3 animate-spin text-amber-500" />}
             </h1>
           </div>
 
-          <div className="hidden sm:block h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
+          <div className="hidden md:block h-6 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
 
-          {/* Quick Metrics (Scrollable on small mobile screens) */}
-          <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto scrollbar-none py-0.5">
-            <div className="shrink-0">
-              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Occupied</span>
-              <span className="text-xs sm:text-sm font-black text-orange-600 dark:text-orange-400 font-mono">
-                {occupiedTables.length} / {tables.length}
+          {/* Quick Metrics (Compact badges) */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto scrollbar-none py-0.5">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/20 shrink-0">
+              <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 font-mono">
+                {occupiedTables.length}/{tables.length}
               </span>
+              <span className="text-[9px] font-semibold text-orange-600/70 hidden sm:inline">Occupied</span>
             </div>
 
-            <div className="shrink-0">
-              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Active</span>
-              <span className="text-xs sm:text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
-                {activeOrders.length} Running
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 shrink-0">
+              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                {activeOrders.length}
               </span>
+              <span className="text-[9px] font-semibold text-indigo-600/70 hidden sm:inline">Active</span>
             </div>
 
-            <div className="shrink-0">
-              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Settled Today</span>
-              <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                 ₹{todaySalesTotal.toLocaleString('en-IN')}
               </span>
+              <span className="text-[9px] font-semibold text-emerald-600/70">Settled</span>
             </div>
           </div>
         </div>
 
-        {/* Hardware & Actions */}
-        <div className="flex items-center justify-between sm:justify-end gap-2.5">
-          {/* Printer Health Pill */}
-          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold">
-            <Printer className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300">Printers:</span>
-            <div className="flex items-center gap-1.5">
+        {/* Right: Actions & Hardware */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Printer Health Dots */}
+          <div 
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold"
+            title={printers.map(p => `${p.name}: ${p.connection_status}`).join('\n')}
+          >
+            <Printer className="w-3 h-3 text-zinc-400 shrink-0" />
+            <div className="flex items-center gap-1">
               {printers.map(p => (
-                <div key={p.id} className="flex items-center gap-1" title={`${p.name} (${p.type}): ${p.connection_status}`}>
-                  <span className={`w-2 h-2 rounded-full ${p.connection_status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                  <span className="text-[9px] uppercase font-bold text-zinc-400 hidden xl:inline">{p.name.split(' ')[0]}</span>
-                </div>
+                <span 
+                  key={p.id} 
+                  className={`w-1.5 h-1.5 rounded-full ${p.connection_status === 'online' ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                />
               ))}
             </div>
           </div>
@@ -859,10 +865,10 @@ export default function OperationalFloorDashboard() {
               setNewTableCapacity(4)
               setIsAddTableOpen(true)
             }}
-            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer shrink-0"
-            title="Add a new dining table to the floor"
+            className="h-7 sm:h-8 px-2.5 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-100 text-xs font-black flex items-center gap-1 transition-all active:scale-95 shadow-xs cursor-pointer shrink-0"
+            title="Add Table"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3" />
             <span className="hidden sm:inline">Add Table</span>
           </button>
 
@@ -870,10 +876,10 @@ export default function OperationalFloorDashboard() {
           <button
             onClick={() => loadDashboardData()}
             disabled={refreshing}
-            className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
-            title="Refresh Floor State"
+            className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
+            title="Refresh Floor"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-500' : ''}`} />
+            <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin text-amber-500' : ''}`} />
           </button>
         </div>
       </header>
@@ -888,30 +894,32 @@ export default function OperationalFloorDashboard() {
           selectedTable ? 'hidden lg:flex' : 'flex'
         }`}>
           
-          {/* Filter Bar (Horizontal scroll on phone) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 gap-2.5 select-none">
-            <div className="flex items-center gap-1.5 p-1 bg-zinc-200/70 dark:bg-zinc-900 rounded-xl overflow-x-auto scrollbar-none">
+          {/* Filter Bar (Horizontal scroll on phone with native segmented pills) */}
+          <div className="flex items-center justify-between pb-2.5 sm:pb-4 gap-2 select-none">
+            <div className="flex items-center gap-1.5 p-1 bg-zinc-200/70 dark:bg-zinc-900 rounded-xl overflow-x-auto scrollbar-none w-full sm:w-auto">
               {[
-                { id: 'all', label: `All (${tables.length})` },
-                { id: 'occupied', label: `Seated (${occupiedTables.length})` },
-                { id: 'billing', label: `Billing (${billingTables.length})` },
-                { id: 'available', label: `Available (${availableTables.length})` }
+                { id: 'all', label: `All (${tables.length})`, dot: null },
+                { id: 'available', label: `Free (${availableTables.length})`, dot: 'bg-emerald-500' },
+                { id: 'occupied', label: `Seated (${occupiedTables.length})`, dot: 'bg-orange-500' },
+                { id: 'billing', label: `Billing (${billingTables.length})`, dot: 'bg-blue-500' }
               ].map(f => (
                 <button
                   key={f.id}
                   onClick={() => setFilterSection(f.id as any)}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                     filterSection === f.id
                       ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
                       : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
                   }`}
                 >
-                  {f.label}
+                  {f.dot && <span className={`w-2 h-2 rounded-full ${f.dot}`} />}
+                  <span>{f.label}</span>
                 </button>
               ))}
             </div>
 
-            <div className="flex items-center gap-3 text-[11px] font-bold text-zinc-400">
+            {/* Desktop-only legend */}
+            <div className="hidden lg:flex items-center gap-3 text-[11px] font-bold text-zinc-400">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Available
               </span>
@@ -925,8 +933,8 @@ export default function OperationalFloorDashboard() {
           </div>
 
           {/* Tables Grid */}
-          <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2.5 sm:gap-3.5">
+          <div className="flex-1 overflow-y-auto pr-0 sm:pr-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1920px]:grid-cols-6 gap-2 sm:gap-2.5 2xl:gap-3">
               {filteredTables.map(t => {
                 const isSelected = selectedTableId === t.id
                 const tableOrders = activeOrders.filter(o => o.table_id === t.id)
@@ -949,61 +957,63 @@ export default function OperationalFloorDashboard() {
                   <button
                     key={t.id}
                     onClick={() => setSelectedTableId(t.id)}
-                    className={`flex flex-col p-4 rounded-2xl border text-left transition-all active:scale-95 cursor-pointer relative overflow-hidden select-none ${
+                    className={`flex flex-col p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-[0.98] cursor-pointer relative overflow-hidden select-none ${
                       isSelected
                         ? 'ring-2 ring-amber-500 border-amber-500 shadow-md'
-                        : 'hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900/60 shadow-xs'
+                        : 'hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xs'
                     } ${
                       isOccupied
-                        ? 'border-orange-500/40 bg-orange-500/[0.03]'
+                        ? 'border-orange-500/50 bg-orange-500/[0.04]'
                         : isBilling
-                        ? 'border-blue-500/40 bg-blue-500/[0.03]'
+                        ? 'border-blue-500/50 bg-blue-500/[0.04]'
                         : 'border-zinc-200/80 dark:border-zinc-800'
                     }`}
                   >
                     {/* Top Row: Table Name + Capacity */}
-                    <div className="flex items-start justify-between w-full">
+                    <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full ${
+                        <span className={`w-2 h-2 rounded-full ${
                           isOccupied ? 'bg-orange-500 animate-pulse' : isBilling ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'
                         }`} />
-                        <span className="text-base font-black text-zinc-900 dark:text-white leading-none">
+                        <span className="text-sm font-black text-zinc-900 dark:text-white leading-none">
                           T{t.number}
                         </span>
                       </div>
                       <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-0.5">
-                        <Users className="w-3 h-3 text-zinc-400" />
+                        <Users className="w-2.5 h-2.5 text-zinc-400" />
                         {t.capacity}
                       </span>
                     </div>
 
                     {/* Middle Info */}
-                    <div className="my-3">
+                    <div className="my-1.5 sm:my-2 min-h-[30px] flex flex-col justify-center">
                       {isAvailable ? (
-                        <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                           Vacant
                         </span>
                       ) : (
                         <div className="space-y-0.5">
-                          <span className="text-sm font-black font-mono text-zinc-900 dark:text-white block">
+                          <span className="text-xs sm:text-sm font-black font-mono text-zinc-900 dark:text-white block leading-none">
                             ₹{runningAmount.toFixed(0)}
                           </span>
-                          <span className="text-[10px] font-bold text-zinc-400 block leading-tight">
-                            {itemsCount} items ordered
+                          <span className="text-[9px] font-bold text-zinc-400 block leading-tight">
+                            {itemsCount} items
                           </span>
                         </div>
                       )}
                     </div>
 
                     {/* Bottom Pill */}
-                    <div className="w-full pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                      <span className={`text-[9px] font-black uppercase tracking-wider ${
+                    <div className="w-full pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[9px]">
+                      <span className={`font-black uppercase tracking-wider ${
                         isOccupied ? 'text-orange-600' : isBilling ? 'text-blue-600' : 'text-emerald-600'
                       }`}>
                         {t.status}
                       </span>
-                      {isSelected && (
-                        <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
+                      {isSelected ? (
+                        <ChevronRight className="w-3 h-3 text-amber-500" />
+                      ) : (
+                        <span className="text-zinc-400 font-medium">Open</span>
                       )}
                     </div>
                   </button>
@@ -1012,8 +1022,11 @@ export default function OperationalFloorDashboard() {
             </div>
           </div>
 
-          {/* BOTTOM STRIP: Real-Time KOT & Print Server Log */}
-          <div className="mt-4 pt-3 border-t border-zinc-200/80 dark:border-zinc-800 shrink-0 select-none">
+          {/* BOTTOM STRIP: Real-Time KOT & Print Server Log
+              (On mobile: Collapsed into a floating status pill to avoid pushing the grid; expandable on tap) */}
+          
+          {/* Desktop Queue Strip */}
+          <div className="hidden lg:block mt-4 pt-3 border-t border-zinc-200/80 dark:border-zinc-800 shrink-0 select-none">
             <div className="flex items-center justify-between pb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-500" />
@@ -1064,58 +1077,83 @@ export default function OperationalFloorDashboard() {
               })}
             </div>
           </div>
+
+          {/* Mobile Floating KOT Drawer Pill */}
+          <div className="lg:hidden shrink-0 pt-2 select-none">
+            <button
+              onClick={() => setIsKOTDrawerOpen(true)}
+              className="w-full py-2 px-3 rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-xs active:scale-98 transition-all"
+            >
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-200">
+                  Print Queue ({recentPrintJobs.length})
+                </span>
+                {recentPrintJobs.some(j => j.status === 'pending') && (
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </div>
+              <span className="text-[11px] font-bold text-zinc-400 flex items-center gap-1">
+                View Queue
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
+          </div>
         </section>
 
         {/* ────────────────────────────────────────────────────────
             RIGHT PANEL: Live Table POS Ticket + In-line Management Console
-            (Full screen on mobile when a table is active, with back navigation)
+            (Full screen on mobile when a table is active, with back navigation.
+             Compact responsive width: 330px on laptop, 370px on 1080p, 410px on 2K/4K)
             ──────────────────────────────────────────────────────── */}
-        <aside className={`border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none ${
-          selectedTable ? 'w-full lg:w-96 flex-1 lg:flex-none flex' : 'hidden lg:flex lg:w-96'
+        <aside className={`border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none transition-[width] duration-200 ${
+          selectedTable 
+            ? 'w-full lg:w-[330px] xl:w-[370px] 2xl:w-[410px] flex-1 lg:flex-none flex' 
+            : 'hidden lg:flex lg:w-[330px] xl:w-[370px] 2xl:w-[410px]'
         }`}>
           
           {selectedTable ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
               
               {/* Table Header with Mobile Back Button */}
-              <div className="p-3 sm:p-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/20 shrink-0">
-                <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="px-3.5 py-2 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/20 shrink-0">
+                <div className="flex items-center gap-2.5">
                   {/* Mobile Back Button */}
                   <button
                     onClick={() => setSelectedTableId(null)}
-                    className="lg:hidden p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-200 active:scale-95 cursor-pointer"
+                    className="lg:hidden p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-200 active:scale-95 cursor-pointer"
                     title="Back to Floor Grid"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
 
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-sm sm:text-base shadow-sm shadow-amber-500/30">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-xs shadow-xs">
                     T{selectedTable.number}
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-black text-zinc-900 dark:text-white leading-tight">
+                    <h3 className="text-xs sm:text-sm font-black text-zinc-900 dark:text-white leading-tight">
                       Table T{selectedTable.number}
                     </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] font-black uppercase tracking-wider ${
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-[9px] font-black uppercase tracking-wider ${
                         selectedTable.status === 'occupied' ? 'text-orange-600' : selectedTable.status === 'billing' ? 'text-blue-600' : 'text-emerald-600'
                       }`}>
                         {selectedTable.status}
                       </span>
                       <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                      <span className="text-[10px] text-zinc-400 font-bold">Cap {selectedTable.capacity}</span>
+                      <span className="text-[9px] text-zinc-400 font-bold">Cap {selectedTable.capacity}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Actions: Edit Table Config & Add Items */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => {
                       setEditingTable(selectedTable)
                       setEditTableCapacity(selectedTable.capacity)
                     }}
-                    className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
+                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     title={`Edit Table T${selectedTable.number} Settings`}
                   >
                     <Settings className="w-3.5 h-3.5" />
@@ -1126,9 +1164,9 @@ export default function OperationalFloorDashboard() {
                       setModalCart([])
                       setIsOrderModalOpen(true)
                     }}
-                    className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3 h-3" />
                     <span>Add Items</span>
                   </button>
                 </div>
@@ -1148,66 +1186,58 @@ export default function OperationalFloorDashboard() {
                 </div>
               )}
 
-              {/* Ordered Items List (Editable, Deletable) */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                <div className="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                    Running Kitchen & Bar Items ({allItemsOnSelectedTable.length})
-                  </span>
-                  <span className="text-[10px] font-bold text-zinc-400">Amount</span>
+              {/* Ordered Items List (Compact POS receipt style) */}
+              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+                <div className="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800 text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+                  <span>Running Items ({allItemsOnSelectedTable.length})</span>
+                  <span>Amount</span>
                 </div>
 
                 {allItemsOnSelectedTable.length === 0 ? (
-                  <div className="py-12 text-center space-y-3">
-                    <Coffee className="w-9 h-9 mx-auto text-zinc-300 dark:text-zinc-700" />
+                  <div className="py-8 text-center space-y-2">
+                    <Coffee className="w-7 h-7 mx-auto text-zinc-300 dark:text-zinc-700" />
                     <div>
-                      <p className="text-xs font-bold text-zinc-500">No active items on Table T{selectedTable.number}</p>
-                      <p className="text-[10px] text-zinc-400 mt-0.5">Click &ldquo;+ Add Items&rdquo; to place an order directly</p>
+                      <p className="text-xs font-bold text-zinc-500">No active items on T{selectedTable.number}</p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">Click &ldquo;+ Add Items&rdquo; to place an order</p>
                     </div>
-                    <button
-                      onClick={() => setIsOrderModalOpen(true)}
-                      className="px-4 py-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-black hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-                    >
-                      + Open Table Menu
-                    </button>
                   </div>
                 ) : (
                   allItemsOnSelectedTable.map((item) => (
                     <div
                       key={item.id}
-                      className="flex flex-col p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-950/40 text-xs gap-1.5"
+                      className="p-1.5 px-2 rounded-lg border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-950/40 text-xs flex flex-col gap-1"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-1 pr-2">
-                          <span className="font-extrabold text-zinc-900 dark:text-white line-clamp-1">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-bold text-zinc-900 dark:text-white truncate text-[11px] leading-tight">
                             {item.menu_items?.name || 'Dish Item'}
                           </span>
-                          <span className="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500">
+                          <span className="text-[8px] uppercase font-bold px-1 py-0.2 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-500 shrink-0">
                             {item.menu_items?.printer_type || 'kitchen'}
                           </span>
                         </div>
-                        <span className="font-black font-mono text-zinc-900 dark:text-white shrink-0">
+                        <span className="font-mono font-bold text-zinc-900 dark:text-white shrink-0 text-xs">
                           ₹{Number(item.total_price || item.unit_price * item.quantity).toFixed(0)}
                         </span>
                       </div>
 
                       {/* In-line Controls: Quantity +/- , Edit Notes, Delete Item */}
                       <div className="flex items-center justify-between pt-1 border-t border-zinc-200/40 dark:border-zinc-800/40 text-[10px]">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           {/* Qty changer */}
-                          <div className="flex items-center bg-zinc-200 dark:bg-zinc-800 rounded-lg h-6 px-1">
+                          <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 rounded-md h-5 px-1">
                             <button
                               onClick={() => handleUpdateItemQuantity(item, -1)}
                               disabled={actionLoading}
-                              className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-75 cursor-pointer"
+                              className="w-4 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-75 cursor-pointer"
                             >
                               <Minus className="w-2.5 h-2.5" />
                             </button>
-                            <span className="w-4 text-center font-black font-mono">{item.quantity}</span>
+                            <span className="w-3.5 text-center font-bold font-mono text-[10px]">{item.quantity}</span>
                             <button
                               onClick={() => handleUpdateItemQuantity(item, 1)}
                               disabled={actionLoading}
-                              className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-75 cursor-pointer"
+                              className="w-4 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white active:scale-75 cursor-pointer"
                             >
                               <Plus className="w-2.5 h-2.5" />
                             </button>
@@ -1221,18 +1251,18 @@ export default function OperationalFloorDashboard() {
                                 value={editingNotesText}
                                 onChange={e => setEditingNotesText(e.target.value)}
                                 placeholder="Special instruction..."
-                                className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[9px] w-32 focus:outline-none"
+                                className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[9px] w-28 focus:outline-none"
                                 autoFocus
                               />
                               <button
                                 onClick={() => handleSaveItemNotes(item.id)}
-                                className="text-emerald-600 font-bold hover:underline"
+                                className="text-emerald-600 font-bold hover:underline text-[9px]"
                               >
                                 Save
                               </button>
                               <button
                                 onClick={() => setEditingItemId(null)}
-                                className="text-zinc-400 hover:underline"
+                                className="text-zinc-400"
                               >
                                 <X className="w-2.5 h-2.5" />
                               </button>
@@ -1243,10 +1273,10 @@ export default function OperationalFloorDashboard() {
                                 setEditingItemId(item.id)
                                 setEditingNotesText(item.notes || '')
                               }}
-                              className="text-[9px] text-zinc-400 hover:text-amber-500 font-bold flex items-center gap-1"
+                              className="text-[9px] text-zinc-400 hover:text-amber-500 font-medium flex items-center gap-0.5"
                             >
                               <Edit2 className="w-2.5 h-2.5" />
-                              {item.notes ? `Note: ${item.notes}` : '+ Add note'}
+                              {item.notes ? `Note: ${item.notes}` : '+ note'}
                             </button>
                           )}
                         </div>
@@ -1255,8 +1285,8 @@ export default function OperationalFloorDashboard() {
                         <button
                           onClick={() => handleDeleteOrderItem(item.id, item.order_id)}
                           disabled={actionLoading}
-                          className="text-red-400 hover:text-red-600 p-1 rounded transition-colors active:scale-90 cursor-pointer"
-                          title="Remove item from order"
+                          className="text-red-400 hover:text-red-600 p-0.5 rounded transition-colors active:scale-90 cursor-pointer"
+                          title="Remove item"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -1266,21 +1296,21 @@ export default function OperationalFloorDashboard() {
                 )}
               </div>
 
-              {/* Bill Computation & Instant Actions (Bottom pinned) */}
-              <div className="p-4 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/30 space-y-3 shrink-0">
+              {/* Bill Computation & Instant Actions (Compact pinned bottom) */}
+              <div className="px-3.5 py-2.5 border-t border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/30 space-y-2 shrink-0">
                 {allItemsOnSelectedTable.length > 0 && (
-                  <div className="space-y-1 text-xs font-bold">
-                    <div className="flex justify-between text-zinc-500">
+                  <div className="space-y-0.5 text-[11px] font-bold">
+                    <div className="flex justify-between text-zinc-400">
                       <span>Subtotal</span>
                       <span className="font-mono">₹{selectedTableSubtotal.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between text-zinc-500">
-                      <span>Estimated Tax (5%)</span>
+                    <div className="flex justify-between text-zinc-400">
+                      <span>GST (5%)</span>
                       <span className="font-mono">₹{(selectedTableSubtotal * 0.05).toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-black text-zinc-900 dark:text-white pt-1 border-t border-zinc-200/60 dark:border-zinc-800">
+                    <div className="flex justify-between text-xs font-black text-zinc-900 dark:text-white pt-1 border-t border-zinc-200/60 dark:border-zinc-800">
                       <span>Total Due</span>
-                      <span className="font-mono text-amber-600 dark:text-amber-500 text-base">
+                      <span className="font-mono text-amber-600 dark:text-amber-500 text-sm">
                         ₹{(selectedTableSubtotal * 1.05).toFixed(0)}
                       </span>
                     </div>
@@ -1289,51 +1319,51 @@ export default function OperationalFloorDashboard() {
 
                 {/* Action Buttons */}
                 {allItemsOnSelectedTable.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 pt-0.5">
                     <button
                       onClick={handlePrintBill}
                       disabled={actionLoading}
-                      className="w-full py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-black text-xs hover:bg-zinc-50 dark:hover:bg-zinc-750 flex items-center justify-center gap-2 active:scale-97 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      className="w-full py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold text-xs hover:bg-zinc-50 dark:hover:bg-zinc-750 flex items-center justify-center gap-1.5 active:scale-97 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                     >
-                      <Receipt className="w-4 h-4 text-amber-500" />
+                      <Receipt className="w-3.5 h-3.5 text-amber-500" />
                       Print Bill Ticket
                     </button>
 
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         onClick={() => handleSettleTable('cash')}
                         disabled={actionLoading}
-                        className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        className="py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                       >
-                        <Banknote className="w-3.5 h-3.5" />
-                        Settle Cash
+                        <Banknote className="w-3 h-3" />
+                        Cash
                       </button>
 
                       <button
                         onClick={() => handleSettleTable('upi')}
                         disabled={actionLoading}
-                        className="py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        className="py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                       >
-                        <QrCode className="w-3.5 h-3.5" />
-                        Settle UPI
+                        <QrCode className="w-3 h-3" />
+                        UPI
                       </button>
 
                       <button
                         onClick={() => handleSettleTable('card')}
                         disabled={actionLoading}
-                        className="py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white font-black text-[11px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        className="py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white font-bold text-[10px] flex items-center justify-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                       >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        Settle Card
+                        <CreditCard className="w-3 h-3" />
+                        Card
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsOrderModalOpen(true)}
-                    className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                    className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-3.5 h-3.5" />
                     Place New Order for T{selectedTable.number}
                   </button>
                 )}
@@ -1356,11 +1386,11 @@ export default function OperationalFloorDashboard() {
 
       {/* ────────────────────────────────────────────────────────
           3. IN-LINE FLOOR POS MODAL (Take Orders Directly from Floor Dashboard)
-          (Full mobile sheet with tabbed Cart / Menu view on mobile)
+          (Full mobile sheet with tabbed Cart / Menu view on mobile; spacious multi-pane on large desktops)
           ──────────────────────────────────────────────────────── */}
       {isOrderModalOpen && selectedTable && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-zinc-950/70 backdrop-blur-xs select-none animate-in fade-in duration-200">
-          <div className="w-full sm:max-w-4xl h-[94vh] sm:h-[88vh] bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+          <div className="w-full sm:max-w-4xl lg:max-w-5xl xl:max-w-6xl h-[94vh] sm:h-[88vh] 2xl:h-[82vh] bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
             
             {/* Modal Header */}
             <div className="p-3 sm:p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-950/30">
@@ -1431,7 +1461,7 @@ export default function OperationalFloorDashboard() {
 
                 {/* Menu Items Grid */}
                 <div className="flex-1 overflow-y-auto pr-1">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-2.5">
                     {filteredModalMenuItems.map(item => {
                       const inCart = modalCart.find(c => c.item.id === item.id)
                       const qty = inCart ? inCart.quantity : 0
@@ -1745,6 +1775,88 @@ export default function OperationalFloorDashboard() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          6. MOBILE KOT QUEUE BOTTOM SHEET (Slide-up modal on demand)
+          ──────────────────────────────────────────────────────── */}
+      {isKOTDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 animate-in fade-in duration-150 select-none">
+          <div 
+            className="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs"
+            onClick={() => setIsKOTDrawerOpen(false)}
+          />
+
+          <div className="relative z-10 w-full bg-white dark:bg-zinc-900 rounded-t-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-5 max-h-[80vh] flex flex-col animate-in slide-in-from-bottom duration-200">
+            {/* Mobile swipe handle */}
+            <div className="-mt-1 pb-2 flex justify-center">
+              <div className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            </div>
+
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <h3 className="text-sm font-black text-zinc-900 dark:text-white">Live KOT & Print Queue</h3>
+                <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                  {recentPrintJobs.length}
+                </span>
+              </div>
+              <button
+                onClick={() => setIsKOTDrawerOpen(false)}
+                className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 space-y-2">
+              {recentPrintJobs.length === 0 ? (
+                <div className="h-32 flex items-center justify-center text-xs font-bold text-zinc-400">
+                  No active or recent print jobs
+                </div>
+              ) : (
+                recentPrintJobs.map(job => {
+                  const payload = job.payload || {}
+                  const isPrinted = job.status === 'printed'
+                  const isPending = job.status === 'pending'
+
+                  return (
+                    <div
+                      key={job.id}
+                      className="p-3 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 flex items-center justify-between text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-zinc-900 dark:text-white">
+                            {payload.kotNumber || payload.billNumber || payload.type || 'PRINT'}
+                          </span>
+                          {payload.tableNumber && (
+                            <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              T{payload.tableNumber}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-medium">
+                          {job.printers?.name || 'Printer'} • {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md ${
+                        isPrinted
+                          ? 'bg-emerald-500/10 text-emerald-600'
+                          : isPending
+                          ? 'bg-amber-500/10 text-amber-600 animate-pulse'
+                          : 'bg-red-500/10 text-red-600'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </div>
+                  )
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

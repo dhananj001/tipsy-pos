@@ -188,50 +188,57 @@ export default function AdminLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         
         {/* Sleek Top Header Navbar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-zinc-200/80 bg-background px-4 dark:border-zinc-900/80">
-          <div className="flex items-center gap-3">
+        <header className="flex h-14 sm:h-16 shrink-0 items-center justify-between border-b border-zinc-200/80 bg-background px-3 sm:px-4 dark:border-zinc-900/80">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Mobile Sidebar Hamburger Toggle */}
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50 lg:hidden dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 text-zinc-500 hover:bg-zinc-50 lg:hidden dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 active:scale-95 transition-all"
               onClick={() => setMobileOpen(true)}
             >
               <Menu className="h-4.5 w-4.5" />
             </button>
+            <span className="text-xs font-black tracking-tight text-foreground sm:hidden">Tipsy POS</span>
             <span className="text-xs font-bold text-muted-foreground hidden sm:inline">Outlet Terminal #1</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Quick Switch to Mobile Captain View for Orders */}
             <Link
               href="/captain/tables"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-xs font-bold transition-all active:scale-95 cursor-pointer min-h-[36px]"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-xs font-bold transition-all active:scale-95 cursor-pointer min-h-[34px] sm:min-h-[36px]"
               title="Switch to Mobile Captain View to take table orders"
             >
               <Smartphone className="w-3.5 h-3.5 text-amber-500" />
               <span className="hidden sm:inline">Captain View</span>
-              <span className="sm:hidden">Captain</span>
+              <span className="sm:hidden text-[11px]">Captain</span>
             </Link>
 
             {/* Premium Theme Switcher */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200/80 text-zinc-650 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              className="flex h-8.5 w-8.5 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-zinc-200/80 text-zinc-650 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
               title="Toggle Theme"
             >
               {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4" />}
             </button>
             
-            <div className="h-5 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+            {/* Live Indicator (Dot on Mobile, Pill on Desktop) */}
+            <div className="hidden sm:block h-5 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
             
-            <span className="text-[10px] font-semibold tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase flex items-center gap-1.5 leading-none font-mono">
-              <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              Live Server Connected
-            </span>
+            <div 
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+              title="Live Server Connected"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">
+                Live Server
+              </span>
+            </div>
           </div>
         </header>
 
         {/* Dynamic Workspace Scroll Container */}
-        <main className="flex-1 overflow-y-auto px-6 py-6 bg-zinc-50 dark:bg-zinc-950/20">
+        <main className="flex-1 overflow-hidden p-0 bg-zinc-50 dark:bg-zinc-950/20">
           {children}
         </main>
       </div>
