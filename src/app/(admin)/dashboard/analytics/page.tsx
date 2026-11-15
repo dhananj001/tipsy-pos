@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -53,6 +54,15 @@ interface PeriodSummary {
 
 export default function PracticalAnalyticsLedger() {
   const { profile } = useAuth()
+  const router = useRouter()
+
+  // Strict Role Guard: Only 'admin' role can view financial sales ledger
+  useEffect(() => {
+    if (profile && profile.role !== 'admin') {
+      router.replace('/dashboard')
+    }
+  }, [profile, router])
+
   // Default to 'today' so data requests and DB IO are minimal on initial load
   const [period, setPeriod] = useState<TimePeriod>('today')
   const [customStartDate, setCustomStartDate] = useState<string>('')
@@ -257,6 +267,21 @@ export default function PracticalAnalyticsLedger() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  // If user is a manager, show access restricted message while router redirects
+  if (profile && profile.role !== 'admin') {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-black text-zinc-900 dark:text-white">Admin Access Only</h3>
+          <p className="text-xs text-zinc-400">Financial Sales Ledger is restricted to restaurant administrators.</p>
+        </div>
+      </div>
+    )
   }
 
   return (

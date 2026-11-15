@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -51,6 +52,15 @@ interface PrintJob {
 
 export default function PrintersManagementPage() {
   const { profile } = useAuth()
+  const router = useRouter()
+
+  // Strict Role Guard: Only 'admin' role can view/modify printer network configs
+  useEffect(() => {
+    if (profile && profile.role !== 'admin') {
+      router.replace('/dashboard')
+    }
+  }, [profile, router])
+
   const [printers, setPrinters] = useState<PrinterConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -479,12 +489,14 @@ export default function PrintersManagementPage() {
     return err.message || 'Could not delete printer. It might be referenced by pending print jobs.'
   }
 
-  if (loading) {
+  if (loading || (profile && profile.role !== 'admin')) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-muted-foreground text-xs font-semibold animate-pulse">Synchronizing Printers configurations...</p>
+          <p className="text-muted-foreground text-xs font-semibold animate-pulse">
+            {profile?.role !== 'admin' ? 'Admin Access Required. Redirecting...' : 'Synchronizing Printers configurations...'}
+          </p>
         </div>
       </div>
     )

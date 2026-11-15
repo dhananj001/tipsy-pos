@@ -63,9 +63,12 @@ export default function AdminLayout({
     { label: 'Restaurant Floor', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Menu Editor', href: '/dashboard/menu', icon: Utensils },
     { label: 'Bills & Audit', href: '/dashboard/orders', icon: Receipt },
-    { label: 'Printers', href: '/dashboard/printers', icon: Printer },
-    { label: 'Staff Management', href: '/dashboard/staff', icon: Users },
-    { label: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
+    // Only administrators can manage hardware printers, staff, and financial sales ledger
+    ...(profile.role === 'admin' ? [
+      { label: 'Printers', href: '/dashboard/printers', icon: Printer },
+      { label: 'Staff Management', href: '/dashboard/staff', icon: Users },
+      { label: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp }
+    ] : []),
   ]
 
   return (

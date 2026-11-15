@@ -111,6 +111,15 @@ During live database inspection via the Supabase MCP server:
     * Unified receipt drawer component shared between **Bills & Audit** (`/dashboard/orders`) and **Sales Ledger** (`/dashboard/analytics`).
     * On the Analytics ledger, clicking any bill row opens the itemized receipt drawer with a single-row index scan (`.eq('id', billId)`). The main ledger query fetches zero item strings, preventing N+1 queries and keeping Supabase Disk IO near zero.
     * **Native Mobile Standards Refactor**: Modernized into an iOS/Android-native bottom-sheet drawer with a swipe drag indicator, 44px+ touch targets, clean horizontal scroll strips for periods and payment filters, and full-screen overlay mode on mobile.
+  * **Strict Role-Based Ledger Isolation**:
+    * Removed "Analytics" / Sales Ledger navigation item from the sidebar for `manager` roles in [`src/app/(admin)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/layout.tsx).
+    * Installed client route protection in [`src/app/(admin)/dashboard/analytics/page.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/analytics/page.tsx): any non-admin attempting direct URL navigation is immediately shown an Access Restricted screen and redirected to `/dashboard`. Only `admin` can view financial sales, taxes, and ledgers.
+* **Modernized Staff Management Screen (`src/app/(admin)/dashboard/staff/page.tsx`):**
+  * Converted into a clean, compact single-column **Roster List** with subtle borders and dividers, matching native iOS/Android settings panels.
+  * Added horizontal swipeable role filter pills (`All Staff`, `Admins`, `Managers`, `Captains`) with live staff counts.
+  * Each row features a role-colored monogram avatar, staff member's name, role badge, email, join date, and touch-friendly (44px+) `Edit Privileges` & `Delete` actions.
+  * Added mobile-friendly bottom-sheet dialogs with swipe handles for Adding, Editing, and Deleting staff.
+  * Multi-tenant security ensured: actions strictly scoped to the active tenant's `restaurant_id`.
 
 ---
 

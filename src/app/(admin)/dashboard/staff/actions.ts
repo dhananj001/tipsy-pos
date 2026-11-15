@@ -40,8 +40,8 @@ async function verifyAdminPermission() {
     throw new Error('Unauthorized: Could not load user profile.')
   }
 
-  if (profile.role !== 'admin' && profile.role !== 'manager') {
-    throw new Error('Unauthorized: Admin or Manager privileges required.')
+  if (profile.role !== 'admin') {
+    throw new Error('Unauthorized: Admin privileges required.')
   }
 
   return { profile, user }
