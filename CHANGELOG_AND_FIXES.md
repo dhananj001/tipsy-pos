@@ -111,9 +111,14 @@ During live database inspection via the Supabase MCP server:
     * Unified receipt drawer component shared between **Bills & Audit** (`/dashboard/orders`) and **Sales Ledger** (`/dashboard/analytics`).
     * On the Analytics ledger, clicking any bill row opens the itemized receipt drawer with a single-row index scan (`.eq('id', billId)`). The main ledger query fetches zero item strings, preventing N+1 queries and keeping Supabase Disk IO near zero.
     * **Native Mobile Standards Refactor**: Modernized into an iOS/Android-native bottom-sheet drawer with a swipe drag indicator, 44px+ touch targets, clean horizontal scroll strips for periods and payment filters, and full-screen overlay mode on mobile.
-  * **Strict Role-Based Ledger Isolation**:
-    * Removed "Analytics" / Sales Ledger navigation item from the sidebar for `manager` roles in [`src/app/(admin)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/layout.tsx).
-    * Installed client route protection in [`src/app/(admin)/dashboard/analytics/page.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/analytics/page.tsx): any non-admin attempting direct URL navigation is immediately shown an Access Restricted screen and redirected to `/dashboard`. Only `admin` can view financial sales, taxes, and ledgers.
+  * **Strict Role-Based Ledger & Hardware Isolation**:
+    * **Sidebar Navigation Control** ([`src/app/(admin)/layout.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/layout.tsx)): The `Printers`, `Staff Management`, and `Analytics` navigation items are conditionally rendered strictly when `profile.role === 'admin'`.
+    * **Route Protection Installed**:
+      * [`src/app/(admin)/dashboard/analytics/page.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/analytics/page.tsx): Non-admin users are blocked from viewing sales, taxes, or revenue ledgers.
+      * [`src/app/(admin)/dashboard/staff/page.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/staff/page.tsx): Non-admin users cannot access or view user credentials/roles.
+      * [`src/app/(admin)/dashboard/printers/page.tsx`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/printers/page.tsx): Non-admin users cannot view hardware IPs or trigger test prints.
+      * Any direct URL attempt by a `manager` or `captain` is greeted with an *"Admin Access Required. Redirecting..."* notification and sent back to `/dashboard`.
+    * **Server-Action Security** ([`src/app/(admin)/dashboard/staff/actions.ts`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/app/(admin)/dashboard/staff/actions.ts)): Creation, updating, and deletion of staff accounts now strictly requires `profile.role === 'admin'`.
 * **Modernized Staff Management Screen (`src/app/(admin)/dashboard/staff/page.tsx`):**
   * Converted into a clean, compact single-column **Roster List** with subtle borders and dividers, matching native iOS/Android settings panels.
   * Added horizontal swipeable role filter pills (`All Staff`, `Admins`, `Managers`, `Captains`) with live staff counts.
