@@ -148,6 +148,11 @@ During live database inspection via the Supabase MCP server:
   * **Slimmer POS Inspector Drawer:** Adjusted width from 400px–460px down to `330px` (laptops) and `370px` (1080p), providing more breathing room for the floor matrix.
   * **Compact Receipt Itemization:** Running table dishes, quantity controls (`- 1 +`), inline notes, and settlement actions (`Cash`, `UPI`, `Card`) now stay pinned and visible without requiring vertical scrolling on standard desktop resolutions.
 
+* **Viewport Scroll & Sticky Positioning Fix (`src/app/(admin)/layout.tsx` & `src/app/(admin)/dashboard/page.tsx`):**
+  * **Resolved Scroll Block:** Removed conflicting nested `overflow-hidden` between `<main>` and the floor page. Restored smooth natural page scrolling (`overflow-y-auto`) across both mobile and desktop.
+  * **Sticky Top Floor Bar:** Placed `sticky top-0 z-30` with `backdrop-blur` on the metrics header so key counters and action buttons stay docked during scroll.
+  * **Anchored Sticky Inspector Panel:** On desktop, the active table POS ticket inspector remains anchored in the viewport (`lg:sticky lg:top-12 lg:h-[calc(100vh-6.5rem)]`) while tables and the print queue scroll smoothly beside it.
+
 ---
 
 ## 5. Verification & Build Integrity
