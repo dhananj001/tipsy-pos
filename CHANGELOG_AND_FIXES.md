@@ -153,6 +153,10 @@ During live database inspection via the Supabase MCP server:
   * **Sticky Top Floor Bar:** Placed `sticky top-0 z-30` with `backdrop-blur` on the metrics header so key counters and action buttons stay docked during scroll.
   * **Anchored Sticky Inspector Panel:** On desktop, the active table POS ticket inspector remains anchored in the viewport (`lg:sticky lg:top-12 lg:h-[calc(100vh-6.5rem)]`) while tables and the print queue scroll smoothly beside it.
 
+* **Captain Table Historical Order Sync Glitch Fix (`src/app/(captain)/captain/tables/page.tsx`):**
+  * **Root Cause:** In the Captain mobile terminal (`/captain/tables`), the card calculation filtered orders using `o.status !== 'cancelled' && o.status !== 'served'`. Because the cashier settled orders by setting `status = 'completed'` (not `'served'`), previously completed and paid orders were erroneously counted towards the table's active ticket if the table was marked available. This caused Table T2 to display historical orders (7 items, ₹8,661, 301h duration) even while marked `AVAILABLE`.
+  * **Fix:** Updated the filter across all Captain calculations to explicitly exclude `completed` orders (`o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'served'`), and enforced that if `table.status === 'available'`, running orders, active item counts, and elapsed occupancy timers are zeroed out (`Empty`).
+
 ---
 
 ## 5. Verification & Build Integrity

@@ -260,7 +260,7 @@ export default function TablesPage() {
           )
         `)
         .eq('table_id', tableId)
-        .neq('status', 'cancelled')
+        .not('status', 'in', '("completed","cancelled","served")')
         .order('created_at', { ascending: true })
 
       if (oError) throw oError
@@ -1082,7 +1082,7 @@ export default function TablesPage() {
   useEffect(() => {
     if (selectedTable && selectedTable.status !== 'available') {
       const runningOrders = selectedTable.orders?.filter(
-        (o: any) => o.status !== 'cancelled' && o.status !== 'served'
+        (o: any) => o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'served'
       ) || []
       setActiveOrders(runningOrders)
       setBillingMode(false)
@@ -1140,7 +1140,8 @@ export default function TablesPage() {
   const grandTotal = taxableAmount + taxAmount + vatAmount + serviceChargeAmount
 
   const getTableOccupiedDuration = (t: Table) => {
-    const list = t.orders?.filter(o => o.status !== 'cancelled' && o.status !== 'served') || []
+    if (t.status === 'available') return null
+    const list = t.orders?.filter(o => o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'served') || []
     if (list.length === 0) return null
     const oldest = list.reduce((old, o) => {
       const time = new Date(o.created_at).getTime()
@@ -1308,7 +1309,9 @@ export default function TablesPage() {
                 },
               }[table.status]
 
-              const runOrders = table.orders?.filter(o => o.status !== 'cancelled' && o.status !== 'served') || []
+              const runOrders = table.status === 'available' 
+                ? [] 
+                : table.orders?.filter(o => o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'served') || []
               const totalAmount = runOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
               const itemsCount = runOrders.reduce((sum, o) => sum + (o.order_items?.reduce((s: number, i: any) => s + i.quantity, 0) || 0), 0)
               const elapsed = getTableOccupiedDuration(table)
