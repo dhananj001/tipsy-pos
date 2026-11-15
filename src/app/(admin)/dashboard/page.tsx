@@ -40,6 +40,7 @@ import {
   Settings,
   PlusCircle
 } from 'lucide-react'
+import { getBusinessShiftRange } from '@/lib/date-utils'
 
 interface TableData {
   id: string
@@ -244,15 +245,15 @@ export default function OperationalFloorDashboard() {
         setRecentPrintJobs(jobsData as unknown as PrintJobData[])
       }
 
-      // E. Today's Completed Sales Total
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
+      // E. Today's Completed Sales Total (using 5:00 AM late-night business shift cutoff)
+      const { startIso, endIso } = getBusinessShiftRange('today')
       const { data: completedSales } = await supabase
         .from('orders')
         .select('total_amount')
         .eq('restaurant_id', restaurantId)
         .eq('status', 'completed')
-        .gte('created_at', startOfDay.toISOString())
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
 
       if (completedSales) {
         const total = (completedSales as any[]).reduce((acc: number, curr: any) => acc + Number(curr.total_amount || 0), 0)

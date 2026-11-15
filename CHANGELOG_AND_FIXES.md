@@ -98,6 +98,19 @@ During live database inspection via the Supabase MCP server:
 * **Repurposed `/dashboard/orders/page.tsx` into Dedicated Bills & Audit Trail:**
   * Displays finalized and active bills with date filtering (Today vs All Recent), search by Bill #, Table, or Dish, and payment method audit.
   * Added one-click **"Reprint Thermal Bill"** that pushes an authenticated duplicate bill payload straight to the counter printer via `print_jobs`.
+* **Practical Accounting Ledger (`/dashboard/analytics/page.tsx`):**
+  * Defaults to **Today** on initial load to minimize data transfer, network latency, and database Disk IO.
+  * Solved the **3:00 AM late-night restaurant closing problem** by implementing a commercial **5:00 AM Business Day Cutoff** ([`src/lib/date-utils.ts`](file:///home/dhananjay/Documents/GitHub/tipsy-pos/src/lib/date-utils.ts)):
+    * Orders closed between midnight (00:00) and 04:59 AM belong to the preceding service shift (e.g. Sunday night sales settled at 2:30 AM are credited to Sunday's shift, not Monday).
+    * Synchronized this logic across the **Floor Dashboard** (`/dashboard`), **Bills & Audit** (`/dashboard/orders`), and **Sales Ledger** (`/dashboard/analytics`).
+  * Converted into an audit ledger with single-tap date filters: **Today**, **Yesterday**, **This Week**, **This Month**, **Last Month**, and **Custom Date Range**.
+  * Shows on-point financial ledger cards: Gross Revenue, Net Food & Bar Sales (pre-tax), GST Collected (5%), and Average Order Value (AOV).
+  * Breaks down cashflow by collection mode (UPI, Cash, Card) and groups entries chronologically by day with transaction times, bill numbers, table numbers, item counts, and amounts.
+  * Added one-click **"Export CSV"** for bookkeeping and tax reporting.
+  * **Zero-Overhead Itemized Thermal Receipt Drawer (`src/components/bill-receipt-modal.tsx`)**:
+    * Unified receipt drawer component shared between **Bills & Audit** (`/dashboard/orders`) and **Sales Ledger** (`/dashboard/analytics`).
+    * On the Analytics ledger, clicking any bill row opens the itemized receipt drawer with a single-row index scan (`.eq('id', billId)`). The main ledger query fetches zero item strings, preventing N+1 queries and keeping Supabase Disk IO near zero.
+    * **Native Mobile Standards Refactor**: Modernized into an iOS/Android-native bottom-sheet drawer with a swipe drag indicator, 44px+ touch targets, clean horizontal scroll strips for periods and payment filters, and full-screen overlay mode on mobile.
 
 ---
 
