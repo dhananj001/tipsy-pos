@@ -19,6 +19,7 @@ import {
   Coffee,
   ShoppingBag,
   ChevronRight,
+  ChevronLeft,
   ExternalLink,
   Flame,
   Check,
@@ -682,39 +683,39 @@ export default function OperationalFloorDashboard() {
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-foreground">
       
       {/* ────────────────────────────────────────────────────────
-          1. TOP METRICS STRIP (Crisp Pulse + Live Hardware Indicators)
+          1. TOP METRICS STRIP (Responsive Pulse + Live Hardware Indicators)
           ──────────────────────────────────────────────────────── */}
-      <header className="shrink-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 px-6 py-3 flex items-center justify-between shadow-xs select-none">
-        <div className="flex items-center gap-6">
+      <header className="shrink-0 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs select-none">
+        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
           <div>
             <span className="text-[10px] font-black tracking-widest uppercase text-zinc-400 block leading-tight">Live Operations</span>
-            <h1 className="text-lg font-black tracking-tight text-zinc-900 dark:text-white leading-tight flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-white leading-tight flex items-center gap-2">
               Restaurant Floor
               {refreshing && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
             </h1>
           </div>
 
-          <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
+          <div className="hidden sm:block h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
 
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-5">
-            <div>
-              <span className="text-[10px] font-bold text-zinc-400 block leading-none">Occupied Tables</span>
-              <span className="text-sm font-black text-orange-600 dark:text-orange-400 font-mono">
+          {/* Quick Metrics (Scrollable on small mobile screens) */}
+          <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto scrollbar-none py-0.5">
+            <div className="shrink-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Occupied</span>
+              <span className="text-xs sm:text-sm font-black text-orange-600 dark:text-orange-400 font-mono">
                 {occupiedTables.length} / {tables.length}
               </span>
             </div>
 
-            <div>
-              <span className="text-[10px] font-bold text-zinc-400 block leading-none">Active Orders</span>
-              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
+            <div className="shrink-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Active</span>
+              <span className="text-xs sm:text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
                 {activeOrders.length} Running
               </span>
             </div>
 
-            <div>
-              <span className="text-[10px] font-bold text-zinc-400 block leading-none">Settled Today</span>
-              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="shrink-0">
+              <span className="text-[9px] sm:text-[10px] font-bold text-zinc-400 block leading-none">Settled Today</span>
+              <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
                 ₹{todaySalesTotal.toLocaleString('en-IN')}
               </span>
             </div>
@@ -722,11 +723,11 @@ export default function OperationalFloorDashboard() {
         </div>
 
         {/* Hardware & Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5">
           {/* Printer Health Pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold">
+          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs font-bold">
             <Printer className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-[11px] text-zinc-600 dark:text-zinc-300">Printers:</span>
+            <span className="text-[10px] sm:text-[11px] text-zinc-600 dark:text-zinc-300">Printers:</span>
             <div className="flex items-center gap-1.5">
               {printers.map(p => (
                 <div key={p.id} className="flex items-center gap-1" title={`${p.name} (${p.type}): ${p.connection_status}`}>
@@ -752,16 +753,18 @@ export default function OperationalFloorDashboard() {
       {/* ────────────────────────────────────────────────────────
           2. MAIN FLOOR LAYOUT (Floor Grid on Left, Live Table POS Inspector on Right)
           ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         
         {/* LEFT AREA: Interactive Tables Floor Plan */}
-        <section className="flex-1 flex flex-col p-6 overflow-hidden">
+        <section className={`flex-1 flex flex-col p-3 sm:p-6 overflow-hidden ${
+          selectedTable ? 'hidden lg:flex' : 'flex'
+        }`}>
           
-          {/* Filter Bar */}
-          <div className="flex items-center justify-between pb-4 select-none">
-            <div className="flex items-center gap-1.5 p-1 bg-zinc-200/70 dark:bg-zinc-900 rounded-xl">
+          {/* Filter Bar (Horizontal scroll on phone) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 gap-2.5 select-none">
+            <div className="flex items-center gap-1.5 p-1 bg-zinc-200/70 dark:bg-zinc-900 rounded-xl overflow-x-auto scrollbar-none">
               {[
-                { id: 'all', label: `All Tables (${tables.length})` },
+                { id: 'all', label: `All (${tables.length})` },
                 { id: 'occupied', label: `Seated (${occupiedTables.length})` },
                 { id: 'billing', label: `Billing (${billingTables.length})` },
                 { id: 'available', label: `Available (${availableTables.length})` }
@@ -769,7 +772,7 @@ export default function OperationalFloorDashboard() {
                 <button
                   key={f.id}
                   onClick={() => setFilterSection(f.id as any)}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                     filterSection === f.id
                       ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
                       : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'
@@ -780,7 +783,7 @@ export default function OperationalFloorDashboard() {
               ))}
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-bold text-zinc-400">
+            <div className="flex items-center gap-3 text-[11px] font-bold text-zinc-400">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Available
               </span>
@@ -795,7 +798,7 @@ export default function OperationalFloorDashboard() {
 
           {/* Tables Grid */}
           <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2.5 sm:gap-3.5">
               {filteredTables.map(t => {
                 const isSelected = selectedTableId === t.id
                 const tableOrders = activeOrders.filter(o => o.table_id === t.id)
@@ -937,20 +940,32 @@ export default function OperationalFloorDashboard() {
 
         {/* ────────────────────────────────────────────────────────
             RIGHT PANEL: Live Table POS Ticket + In-line Management Console
+            (Full screen on mobile when a table is active, with back navigation)
             ──────────────────────────────────────────────────────── */}
-        <aside className="w-96 border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none">
+        <aside className={`border-l border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 shadow-lg select-none ${
+          selectedTable ? 'w-full lg:w-96 flex-1 lg:flex-none flex' : 'hidden lg:flex lg:w-96'
+        }`}>
           
           {selectedTable ? (
             <div className="flex-1 flex flex-col overflow-hidden">
               
-              {/* Table Header */}
-              <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/20 shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-base shadow-sm shadow-amber-500/30">
+              {/* Table Header with Mobile Back Button */}
+              <div className="p-3 sm:p-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/20 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  {/* Mobile Back Button */}
+                  <button
+                    onClick={() => setSelectedTableId(null)}
+                    className="lg:hidden p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-200 active:scale-95 cursor-pointer"
+                    title="Back to Floor Grid"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-sm sm:text-base shadow-sm shadow-amber-500/30">
                     T{selectedTable.number}
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-zinc-900 dark:text-white leading-tight">
+                    <h3 className="text-sm sm:text-base font-black text-zinc-900 dark:text-white leading-tight">
                       Table T{selectedTable.number}
                     </h3>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -960,7 +975,7 @@ export default function OperationalFloorDashboard() {
                         {selectedTable.status}
                       </span>
                       <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                      <span className="text-[10px] text-zinc-400 font-bold">Capacity {selectedTable.capacity}</span>
+                      <span className="text-[10px] text-zinc-400 font-bold">Cap {selectedTable.capacity}</span>
                     </div>
                   </div>
                 </div>
@@ -974,7 +989,7 @@ export default function OperationalFloorDashboard() {
                   className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Add Items
+                  <span>Add Items</span>
                 </button>
               </div>
 
@@ -1200,22 +1215,23 @@ export default function OperationalFloorDashboard() {
 
       {/* ────────────────────────────────────────────────────────
           3. IN-LINE FLOOR POS MODAL (Take Orders Directly from Floor Dashboard)
+          (Full mobile sheet with tabbed Cart / Menu view on mobile)
           ──────────────────────────────────────────────────────── */}
       {isOrderModalOpen && selectedTable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs select-none animate-in fade-in duration-200">
-          <div className="w-full max-w-4xl h-[88vh] bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-zinc-950/70 backdrop-blur-xs select-none animate-in fade-in duration-200">
+          <div className="w-full sm:max-w-4xl h-[94vh] sm:h-[88vh] bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl border-t sm:border border-zinc-200/80 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
             
             {/* Modal Header */}
-            <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-950/30">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-sm">
+            <div className="p-3 sm:p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-950/30">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-xs sm:text-sm">
                   T{selectedTable.number}
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-zinc-900 dark:text-white leading-tight">
+                  <h3 className="text-xs sm:text-sm font-black text-zinc-900 dark:text-white leading-tight">
                     Add Items to Table T{selectedTable.number}
                   </h3>
-                  <span className="text-[10px] text-zinc-400 font-bold">Fast In-Line POS Terminal</span>
+                  <span className="text-[10px] text-zinc-400 font-bold">Fast POS Ordering</span>
                 </div>
               </div>
 
@@ -1227,14 +1243,14 @@ export default function OperationalFloorDashboard() {
               </button>
             </div>
 
-            {/* Modal Main Area (Menu on Left, Current Cart on Right) */}
-            <div className="flex-1 flex overflow-hidden">
+            {/* Modal Main Area (Responsive: Stack on mobile, Split on desktop) */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               
-              {/* Menu Browser (Left 60%) */}
-              <div className="flex-1 flex flex-col p-4 overflow-hidden border-r border-zinc-200 dark:border-zinc-800">
+              {/* Menu Browser */}
+              <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800">
                 
                 {/* Search Bar */}
-                <div className="relative mb-3 shrink-0">
+                <div className="relative mb-2.5 shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
                     type="text"
@@ -1274,7 +1290,7 @@ export default function OperationalFloorDashboard() {
 
                 {/* Menu Items Grid */}
                 <div className="flex-1 overflow-y-auto pr-1">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                     {filteredModalMenuItems.map(item => {
                       const inCart = modalCart.find(c => c.item.id === item.id)
                       const qty = inCart ? inCart.quantity : 0
@@ -1332,8 +1348,8 @@ export default function OperationalFloorDashboard() {
 
               </div>
 
-              {/* Cart & Send KOT (Right 40%) */}
-              <div className="w-80 flex flex-col p-4 bg-zinc-50/50 dark:bg-zinc-950/20 overflow-hidden shrink-0">
+              {/* Cart & Send KOT (Bottom sheet on mobile, Right 40% on desktop) */}
+              <div className="w-full md:w-80 max-h-56 md:max-h-none flex flex-col p-3 sm:p-4 bg-zinc-50/50 dark:bg-zinc-950/20 overflow-hidden shrink-0">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                     Items to Send ({modalCart.reduce((s, c) => s + c.quantity, 0)})
@@ -1348,31 +1364,31 @@ export default function OperationalFloorDashboard() {
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto py-3 space-y-2">
+                <div className="flex-1 overflow-y-auto py-2 sm:py-3 space-y-2">
                   {modalCart.length === 0 ? (
-                    <div className="py-16 text-center space-y-2">
-                      <ShoppingBag className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-700" />
+                    <div className="py-6 md:py-16 text-center space-y-1">
+                      <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8 mx-auto text-zinc-300 dark:text-zinc-700" />
                       <p className="text-xs font-bold text-zinc-400">Cart is empty</p>
-                      <p className="text-[10px] text-zinc-400">Click ADD on any dish to prepare KOT</p>
+                      <p className="text-[10px] text-zinc-400">Tap ADD on dishes above</p>
                     </div>
                   ) : (
                     modalCart.map(c => (
-                      <div key={c.item.id} className="p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs space-y-1.5">
+                      <div key={c.item.id} className="p-2 sm:p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs space-y-1.5">
                         <div className="flex items-center justify-between font-bold">
                           <span className="text-zinc-900 dark:text-white line-clamp-1">{c.item.name}</span>
                           <span className="font-mono">₹{(c.item.price * c.quantity).toFixed(0)}</span>
                         </div>
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <input
                             type="text"
-                            placeholder="+ Chef note..."
+                            placeholder="+ Note..."
                             value={c.notes}
                             onChange={e => updateModalCartNotes(c.item.id, e.target.value)}
-                            className="bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 text-[10px] w-36 focus:outline-none"
+                            className="bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 text-[10px] flex-1 focus:outline-none"
                           />
 
-                          <div className="flex items-center bg-zinc-200 dark:bg-zinc-800 rounded-lg h-6 px-1">
+                          <div className="flex items-center bg-zinc-200 dark:bg-zinc-800 rounded-lg h-6 px-1 shrink-0">
                             <button onClick={() => removeFromModalCart(c.item.id)} className="w-5 text-center cursor-pointer">
                               <Minus className="w-2.5 h-2.5 mx-auto" />
                             </button>
@@ -1388,7 +1404,7 @@ export default function OperationalFloorDashboard() {
                 </div>
 
                 {/* Send KOT Button */}
-                <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 shrink-0 space-y-2">
+                <div className="pt-2 sm:pt-3 border-t border-zinc-200 dark:border-zinc-800 shrink-0 space-y-2">
                   <div className="flex justify-between text-xs font-black">
                     <span className="text-zinc-400 uppercase tracking-wider text-[10px]">New Order Total</span>
                     <span className="text-amber-500 font-mono text-sm">
@@ -1399,7 +1415,7 @@ export default function OperationalFloorDashboard() {
                   <button
                     onClick={handleSendKOTFromFloor}
                     disabled={modalCart.length === 0 || sendingKOT}
-                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 active:scale-97 transition-all shadow-md shadow-orange-500/20 cursor-pointer"
+                    className="w-full py-2.5 sm:py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 active:scale-97 transition-all shadow-md shadow-orange-500/20 cursor-pointer"
                   >
                     {sendingKOT ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
