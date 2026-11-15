@@ -303,7 +303,7 @@ export default function OperationalFloorDashboard() {
 
     if (profile?.restaurant_id) {
       const channel = supabase
-        .channel('dashboard_realtime_ops')
+        .channel(`dashboard_realtime_ops_${profile.restaurant_id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tables', filter: `restaurant_id=eq.${profile.restaurant_id}` }, debouncedReload)

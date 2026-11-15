@@ -359,7 +359,7 @@ export default function AdminTablesPage() {
     fetchTables()
 
     const channel = supabase
-      .channel('admin:tables')
+      .channel(`admin:tables:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         {

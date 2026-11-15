@@ -133,7 +133,7 @@ export default function PrintersManagementPage() {
 
     // Subscribe to printers database changes
     const printersChannel = supabase
-      .channel('admin:printers')
+      .channel(`admin:printers:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         {
@@ -161,7 +161,7 @@ export default function PrintersManagementPage() {
 
     // Subscribe to print_jobs database changes
     const jobsChannel = supabase
-      .channel('admin:print_jobs')
+      .channel(`admin:print_jobs:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         {

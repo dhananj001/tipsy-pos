@@ -104,7 +104,7 @@ export default function StaffManagementPage() {
 
     // Subscribe to public.users updates (filtered by restaurant)
     const channel = supabase
-      .channel('admin:staff')
+      .channel(`admin:staff:${profile.restaurant_id}`)
       .on(
         'postgres_changes',
         {

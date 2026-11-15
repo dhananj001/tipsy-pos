@@ -31,13 +31,13 @@ export const listenerService = {
     // 4. Set up real-time subscription for new print jobs
     setupPrintJobsSubscription();
 
-    // 5. Start background printer connection status checks
+    // 5. Start background printer connection status checks (throttled to 45s)
     startPrinterHeartbeat();
 
-    // 6. Fail-safe periodic polling queue every 10 seconds (in case WebSocket misses an INSERT)
+    // 6. Fail-safe periodic polling queue every 45 seconds (in case WebSocket misses an INSERT during network drops)
     setInterval(() => {
       processPendingJobsQueue();
-    }, 10000);
+    }, 45000);
 
     logger.success("All listener services are active and running!");
   }
@@ -86,12 +86,15 @@ function handlePrinterCacheUpdate(type, printer) {
  * Real-time listener for printer changes (IP, port, addition, deletion)
  */
 function setupPrintersSubscription() {
+  const channelName = CONFIG.restaurantId 
+    ? `printers_cache_sync_${CONFIG.restaurantId}` 
+    : "printers_cache_sync";
   const filter = CONFIG.restaurantId 
     ? `restaurant_id=eq.${CONFIG.restaurantId}` 
     : undefined;
 
   supabase
-    .channel("printers_cache_sync")
+    .channel(channelName)
     .on(
       "postgres_changes",
       {
@@ -218,12 +221,15 @@ async function processJob(job) {
  * Real-time listener for new print jobs
  */
 function setupPrintJobsSubscription() {
+  const channelName = CONFIG.restaurantId 
+    ? `new_print_jobs_${CONFIG.restaurantId}` 
+    : "new_print_jobs";
   const filter = CONFIG.restaurantId 
     ? `restaurant_id=eq.${CONFIG.restaurantId}` 
     : undefined;
 
   supabase
-    .channel("new_print_jobs")
+    .channel(channelName)
     .on(
       "postgres_changes",
       {
@@ -284,14 +290,14 @@ async function processPendingJobsQueue() {
 }
 
 /**
- * Start periodic printer health check ping loops
+ * Start periodic printer health check ping loops (throttled to 45s)
  */
 function startPrinterHeartbeat() {
-  logger.info("Starting background printer health check heartbeat loop (every 20s)...");
+  logger.info("Starting background printer health check heartbeat loop (every 45s)...");
   
-  // Run immediately on startup, then every 20 seconds
+  // Run immediately on startup, then every 45 seconds
   pingAllPrinters();
-  setInterval(pingAllPrinters, 20000);
+  setInterval(pingAllPrinters, 45000);
 }
 
 /**
